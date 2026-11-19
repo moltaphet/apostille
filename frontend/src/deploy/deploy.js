@@ -14,6 +14,8 @@ const PRIMUS = D.primusVerifier[CHAIN.chainId];
 
 // ── state & DOM ─────────────────────────────────────────────────────────
 let account = "";
+let connecting = false;
+const PENDING_TEXT = "Your wallet already has a connection request open. Approve or cancel it in the wallet window, then try again.";
 const $ = (id) => document.getElementById(id);
 const btnConnect = $("btn-connect");
 const btnDeploy = $("btn-deploy");
@@ -68,14 +70,22 @@ async function refresh() {
 }
 
 btnConnect.addEventListener("click", async () => {
+  if (connecting) return; // a wallet popup is already open
   if (!window.ethereum) return showNotice("No browser wallet found. Install MetaMask, OKX Wallet or Rabby.");
   try {
+    connecting = true;
+    btnConnect.disabled = true;
+    btnConnect.textContent = "Check your wallet…";
     const [a] = await window.ethereum.request({ method: "eth_requestAccounts" });
     await ensureChain();
     account = a;
     await refresh();
   } catch (err) {
-    showNotice(err?.shortMessage || err?.message || String(err));
+    showNotice((err?.code === -32002 || /already (processing|pending)/i.test(err?.message || "")) ? PENDING_TEXT : err?.shortMessage || err?.message || String(err));
+    if (!account) btnConnect.textContent = "Connect wallet";
+  } finally {
+    connecting = false;
+    btnConnect.disabled = false;
   }
 });
 

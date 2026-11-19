@@ -21,6 +21,8 @@ const ZERO_HASH = "0x" + "0".repeat(64);
 
 // ── State ───────────────────────────────────────────────────────────────
 let account = "";
+let connecting = false;
+const PENDING_TEXT = "Your wallet already has a connection request open. Approve or cancel it in the wallet window, then try again.";
 let tiers = FALLBACK_TIERS;
 let primusReady = false;
 let primusInitError = null;
@@ -225,15 +227,23 @@ function setAccount(a) {
 }
 
 btnConnect.addEventListener("click", async () => {
+  if (connecting) return; // a wallet popup is already open
   showNotice("");
   if (account) return setAccount("");
   if (!window.ethereum) return showNotice("No browser wallet found. Install MetaMask, OKX Wallet or Rabby, then reload.");
   try {
+    connecting = true;
+    btnConnect.disabled = true;
+    btnConnect.textContent = "Check your wallet…";
     const [a] = await window.ethereum.request({ method: "eth_requestAccounts" });
     await ensureChain();
     setAccount(a);
   } catch (err) {
-    showNotice(explain(err));
+    showNotice((err?.code === -32002 || /already (processing|pending)/i.test(err?.message || "")) ? PENDING_TEXT : explain(err));
+    if (!account) btnConnect.textContent = "Connect wallet";
+  } finally {
+    connecting = false;
+    btnConnect.disabled = false;
   }
 });
 
