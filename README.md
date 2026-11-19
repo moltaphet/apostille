@@ -91,6 +91,12 @@ a seal lasts 30 days (one volume window) and can be renewed anytime with a fresh
 
 ## integrate
 
+### see it
+
+[`/perp`](https://apostille-two.vercel.app/perp) is an order ticket priced the way a perp DEX would after integrating: it reads your live seal and shows your taker fee next to every other tier.
+
+### solidity
+
 ```solidity
 interface IApostille {
     function tierOf(address wallet)
@@ -99,6 +105,26 @@ interface IApostille {
 
 (bool active, , uint16 discountBps) = IApostille(APOSTILLE).tierOf(trader);
 uint256 fee = active ? baseFee * (10_000 - discountBps) / 10_000 : baseFee;
+```
+
+or use the helper library, which caps the discount and fails open (a revert or a missing registry falls back to the base fee, so trading never depends on Apostille being up):
+
+```solidity
+import {IApostille} from "apostille/contracts/integrations/IApostille.sol";
+import {ApostilleFees} from "apostille/contracts/integrations/ApostilleFees.sol";
+
+using ApostilleFees for IApostille;
+(uint256 fee, uint256 ratePips, uint8 tier) = apostille.feeOn(trader, notional, 500, 5000); // 0.05% base, max 50% off
+```
+
+`contracts/examples/DemoPerp.sol` is a complete (demo-only) venue built this way: margin, signed positions, discounted taker fees to a treasury.
+
+### javascript
+
+```js
+import { getTier, feeOn } from "@apostille/sdk"; // packages/apostille-sdk
+const tier = await getTier(provider, trader, { chainId: 97 });
+const { fee } = feeOn(notional, 500n, tier, 5000);
 ```
 
 also available: `sealOf(address)` for the full record (VIP level, volumes, expiry, uid hash), `tiers()`, `previewTier(vip, volume)`, and the `Sealed` / `Released` events for indexers.
@@ -123,7 +149,7 @@ the signer (`frontend/api/sign.js`) is the off-chain half: it only signs request
 ## repository
 
 ```
-contracts/            Apostille.sol, AttestorVerifier.sol, FlatJson parser, Primus interface, hardhat tests + deploy scripts
+contracts/            Apostille.sol, AttestorVerifier.sol, integrations/ (IApostille, ApostilleFees), examples/DemoPerp.sol, tests + deploy scripts
 frontend/             vite dapp: connect, prove, seal, certificate view, live tier table
 frontend/api/sign.js  vercel function that holds the Primus app secret and signs requests
 frontend/lib/         signer policy shared by the function and local dev
@@ -140,7 +166,7 @@ easiest: open `/deploy` on the running site, connect a wallet on BSC testnet and
 ```bash
 cd contracts
 npm install
-npm test                      # 44 tests
+npm test                      # 52 tests
 cp .env.example .env          # add DEPLOYER_PRIVATE_KEY
 npm run deploy:bsc-testnet    # writes deployments/97.json
 npm run export:frontend       # refresh the bytecode used by /deploy after contract changes

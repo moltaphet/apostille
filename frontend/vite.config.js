@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
     define: { global: "globalThis" },
     build: {
       target: "es2022",
-      rollupOptions: { input: { main: "index.html", deploy: "deploy.html" } },
+      rollupOptions: { input: { main: "index.html", deploy: "deploy.html", perp: "perp.html" } },
     },
   };
 });
