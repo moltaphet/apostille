@@ -6,6 +6,7 @@ import "@fontsource/big-shoulders-display/900";
 import "../style.css";
 import "./deploy.css";
 import { BrowserProvider, ContractFactory, formatEther } from "ethers";
+import { ensureChain, WRONG_CHAIN_TEXT } from "../wallet.js";
 import { CHAIN } from "../config.js";
 import artifact from "./apostille.artifact.json";
 
@@ -38,16 +39,6 @@ $("p-tiers").textContent = D.tiers
   .map((t) => `${t.name}: VIP ${t.minVipLevel} or ${usd(t.minFuturesVolume)}, ${t.feeDiscountBps / 100}% off`)
   .join("\n");
 
-async function ensureChain() {
-  const current = await window.ethereum.request({ method: "eth_chainId" });
-  if (current === CHAIN.hex) return;
-  try {
-    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN.hex }] });
-  } catch (err) {
-    if (err.code === 4902) await window.ethereum.request({ method: "wallet_addEthereumChain", params: [CHAIN.params] });
-    else throw err;
-  }
-}
 
 async function refresh() {
   btnConnect.textContent = account ? short(account) : "Connect wallet";
@@ -55,6 +46,11 @@ async function refresh() {
   btnDeploy.disabled = !account;
   if (!account) return ($("p-balance").textContent = "–");
 
+  const chainId = await window.ethereum.request({ method: "eth_chainId" });
+  if (chainId?.toLowerCase() !== CHAIN.hex) {
+    btnDeploy.disabled = true;
+    return showNotice(WRONG_CHAIN_TEXT);
+  }
   const provider = new BrowserProvider(window.ethereum);
   const [bal, code] = await Promise.all([provider.getBalance(account), provider.getCode(PRIMUS)]);
   $("p-balance").textContent = `${Number(formatEther(bal)).toFixed(4)} tBNB`;
@@ -77,8 +73,16 @@ btnConnect.addEventListener("click", async () => {
     btnConnect.disabled = true;
     btnConnect.textContent = "Check your wallet…";
     const [a] = await window.ethereum.request({ method: "eth_requestAccounts" });
-    await ensureChain();
     account = a;
+    try {
+      await ensureChain();
+    } catch (err) {
+      showNotice(WRONG_CHAIN_TEXT);
+      btnDeploy.disabled = true;
+      btnConnect.textContent = short(account);
+      $("p-owner").textContent = account;
+      return;
+    }
     await refresh();
   } catch (err) {
     showNotice((err?.code === -32002 || /already (processing|pending)/i.test(err?.message || "")) ? PENDING_TEXT : err?.shortMessage || err?.message || String(err));

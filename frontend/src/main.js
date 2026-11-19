@@ -8,6 +8,7 @@ import { PrimusZKTLS } from "@primuslabs/zktls-js-sdk";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
 import { CONFIG, CHAIN, APOSTILLE_ABI, ERROR_TEXT } from "./config.js";
 import { drawRosette } from "./guilloche.js";
+import { ensureChain, WRONG_CHAIN_TEXT } from "./wallet.js";
 
 // Shown before the contract is reachable, so the page still explains itself.
 const FALLBACK_TIERS = [
@@ -99,16 +100,6 @@ function explain(err) {
 }
 
 // ── Chain ────────────────────────────────────────────────────────────────
-async function ensureChain() {
-  const current = await window.ethereum.request({ method: "eth_chainId" });
-  if (current === CHAIN.hex) return;
-  try {
-    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN.hex }] });
-  } catch (err) {
-    if (err.code === 4902) await window.ethereum.request({ method: "wallet_addEthereumChain", params: [CHAIN.params] });
-    else throw err;
-  }
-}
 
 // ── Certificate ──────────────────────────────────────────────────────────
 function renderCertificate(seal, status, { animate = false } = {}) {
@@ -236,8 +227,12 @@ btnConnect.addEventListener("click", async () => {
     btnConnect.disabled = true;
     btnConnect.textContent = "Check your wallet…";
     const [a] = await window.ethereum.request({ method: "eth_requestAccounts" });
-    await ensureChain();
     setAccount(a);
+    try {
+      await ensureChain();
+    } catch (err) {
+      showNotice(err?.code === 4001 ? WRONG_CHAIN_TEXT : `${WRONG_CHAIN_TEXT} (${explain(err)})`);
+    }
   } catch (err) {
     showNotice((err?.code === -32002 || /already (processing|pending)/i.test(err?.message || "")) ? PENDING_TEXT : explain(err));
     if (!account) btnConnect.textContent = "Connect wallet";
