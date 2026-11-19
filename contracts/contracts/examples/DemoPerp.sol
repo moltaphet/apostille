@@ -36,10 +36,12 @@ contract DemoPerp is Ownable2Step {
     error ZeroAmount();
     error InsufficientMargin(uint256 needed, uint256 available);
     error FeeTooHigh();
+    error ZeroAddress();
 
     constructor(address owner_, IERC20 collateral_, IApostille apostille_, address treasury_, uint256 baseFeePips_, uint16 maxDiscountBps_)
         Ownable(owner_)
     {
+        if (treasury_ == address(0)) revert ZeroAddress();
         collateral = collateral_;
         apostille = apostille_;
         treasury = treasury_;
@@ -98,6 +100,7 @@ contract DemoPerp is Ownable2Step {
     }
 
     function setTreasury(address treasury_) external onlyOwner {
+        if (treasury_ == address(0)) revert ZeroAddress();
         treasury = treasury_;
     }
 

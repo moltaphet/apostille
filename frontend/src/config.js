@@ -40,6 +40,8 @@ export const APOSTILLE_ABI = [
   "error AccountBoundElsewhere(address wallet)",
   "error NoActiveSeal(address wallet)",
   "error KeyNotFound(string key)",
+  "error SealingPaused()",
+  "error MalformedPayload()",
   "error InvalidNumber(string value)",
   "error InvalidHex(string value)",
 ];
@@ -58,4 +60,6 @@ export const ERROR_TEXT = {
   IdNotHashed: "The Binance user ID wasn't hashed in this proof. Start the proof again.",
   MissingField: "The proof is missing a field Apostille needs. Start the proof again.",
   UnsupportedCondition: "The proof uses a condition Apostille doesn't accept.",
+  SealingPaused: "New seals are paused right now. Existing seals still work. Try again later.",
+  MalformedPayload: "The proof's data isn't in the shape Apostille expects. Start the proof again.",
 };
