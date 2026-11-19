@@ -15,7 +15,7 @@ export const APOSTILLE_ABI = [
 export const DEPLOYMENTS = {
   97: {
     name: "BNB Smart Chain testnet",
-    apostille: "0x2d4a5728Ee2d43da19167aC33D0F047A877e9728",
+    apostille: "0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45",
     verifier: "0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059",
   },
 };
