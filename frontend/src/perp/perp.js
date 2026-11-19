@@ -24,6 +24,7 @@ const FALLBACK_TIERS = [
 let tiers = FALLBACK_TIERS;
 let mine = null; // { active, tier, discountBps } for the connected wallet
 let account = "";
+let connecting = false;
 const $ = (id) => document.getElementById(id);
 const size = $("size");
 const asTier = $("as-tier");
@@ -99,7 +100,10 @@ $("presets").addEventListener("click", (e) => {
 asTier.addEventListener("change", render);
 
 btnConnect.addEventListener("click", async () => {
+  if (connecting) return;
   if (!window.ethereum) return ($("size-hint").textContent = "No browser wallet found. You can still preview any tier.");
+  connecting = true;
+  btnConnect.disabled = true;
   try {
     const [a] = await window.ethereum.request({ method: "eth_requestAccounts" });
     account = a;
@@ -113,7 +117,12 @@ btnConnect.addEventListener("click", async () => {
     renderOptions();
     render();
   } catch (err) {
-    $("size-hint").textContent = err?.shortMessage || err?.message || String(err);
+    $("size-hint").textContent = /already (processing|pending)/i.test(err?.message || "") || err?.code === -32002
+      ? "Your wallet already has a connection request open. Approve or cancel it in the wallet window."
+      : err?.shortMessage || err?.message || String(err);
+  } finally {
+    connecting = false;
+    btnConnect.disabled = false;
   }
 });
 
