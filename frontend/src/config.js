@@ -2,7 +2,8 @@ export const CONFIG = {
   appId: import.meta.env.VITE_PRIMUS_APP_ID,
   templateId: import.meta.env.VITE_PRIMUS_TEMPLATE_ID || "9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e",
   signerUrl: (import.meta.env.VITE_SIGNER_URL || "/api").replace(/\/$/, ""),
-  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS,
+  // Public testnet deployment; override with VITE_APOSTILLE_ADDRESS.
+  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x2d4a5728Ee2d43da19167aC33D0F047A877e9728",
 };
 
 export const CHAIN = {

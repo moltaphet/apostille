@@ -146,7 +146,7 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 
 | network | apostille | verifier |
 |---|---|---|
-| BNB Smart Chain testnet (97) | [`0x2d4a…9728`](https://testnet.bscscan.com/address/0x2d4a5728Ee2d43da19167aC33D0F047A877e9728) | switching to `AttestorVerifier` |
+| BNB Smart Chain testnet (97) | [`0x2d4a…9728`](https://testnet.bscscan.com/address/0x2d4a5728Ee2d43da19167aC33D0F047A877e9728) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
 
 ## roadmap
 
