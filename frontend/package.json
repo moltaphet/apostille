@@ -11,6 +11,8 @@
     "test": "node test/sign.parity.mjs"
   },
   "dependencies": {
+    "@fontsource/big-shoulders-display": "^5.3.0",
+    "@fontsource/public-sans": "^5.3.0",
     "@primuslabs/zktls-js-sdk": "^0.3.0",
     "ethers": "^6.13.0"
   },
