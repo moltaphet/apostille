@@ -27,7 +27,7 @@
       <dl class="params" id="params">
         <div><dt>Network</dt><dd>BNB Smart Chain testnet (97)</dd></div>
         <div><dt>Owner</dt><dd id="p-owner">Connect a wallet</dd></div>
-        <div><dt>Verifier</dt><dd>A new AttestorVerifier you own, trusting Primus's enterprise attestor <span id="p-attestor" class="hash"></span></dd></div>
+        <div><dt>Verifier</dt><dd>The existing AttestorVerifier if it already trusts Primus's enterprise attestor <span id="p-attestor" class="hash"></span>, otherwise a new one you own</dd></div>
         <div><dt>Proof must be newer than</dt><dd id="p-age">–</dd></div>
         <div><dt>Seal lasts</dt><dd id="p-validity">–</dd></div>
         <div><dt>Tiers</dt><dd id="p-tiers">–</dd></div>
@@ -35,7 +35,7 @@
       </dl>
 
       <button id="btn-deploy" class="btn btn-ink" type="button" disabled>Deploy Apostille</button>
-      <p class="flow-hint">Two transactions: the verifier, then Apostille pointing at it.</p>
+      <p class="flow-hint">One transaction when the verifier already exists, two when it has to be deployed first.</p>
       <div class="notice" id="notice" role="status" hidden></div>
 
       <section class="result" id="result" hidden>

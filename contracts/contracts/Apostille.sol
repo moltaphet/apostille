@@ -50,6 +50,9 @@ contract Apostille is Ownable2Step {
     string public constant SOURCE_URL =
         "https://www.binance.com/bapi/accounts/v1/private/vip/vip-portal/vip-fee/vip-fee-summary";
 
+    /// @notice Key under which Primus reports the SHA256-hashed Binance user id.
+    string public constant HASHED_USER_ID_KEY = "SHA256($.data.userId)";
+
     uint256 public constant MAX_TIERS = 16;
     uint256 private constant MAX_CLOCK_DRIFT = 5 minutes;
 
@@ -153,7 +156,9 @@ contract Apostille is Ownable2Step {
 
         // 5. Decode the verified payload.
         string memory data = att.data;
-        bytes32 accountHash = data.get("userId").toBytes32();
+        // Primus names a hashed field after the operation: SHA256(<jsonPath>). Its presence in
+        // the signed payload is itself proof that the raw user id was never revealed.
+        bytes32 accountHash = data.get(HASHED_USER_ID_KEY).toBytes32();
         uint256 vip = data.get("vipLevel").toUintFloor();
         uint256 spot = data.get("spot30dVol").toUintFloor();
         uint256 futures = data.get("futures30dVol").toUintFloor();

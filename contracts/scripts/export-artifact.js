@@ -24,6 +24,8 @@ fs.writeFileSync(
         primusVerifier: { 97: "0x4620362a803f82b7231b18e09abc5d400a7891fb" },
         // Signs attestations from @primuslabs/zktls-js-sdk (PADOADDRESSMAP.production).
         enterpriseAttestor: "0x5Ed3176045F68617B0958a61ac1868875C98C14d",
+        // AttestorVerifier already deployed on BSC testnet; reused when it accepts the SDK attestor.
+        existingVerifier: { 97: "0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059" },
       },
     },
     null,

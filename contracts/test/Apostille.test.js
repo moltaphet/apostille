@@ -20,19 +20,26 @@ const FIELDS = [
 
 async function attestation(recipient, overrides = {}) {
   const now = BigInt(await time.latest());
+  // Mirrors a real Primus attestation: decimals as strings, the hashed id keyed by its op.
+  const { userId = ACCOUNT_A, ...rest } = overrides.data || {};
   const data = {
-    userId: ACCOUNT_A,
+    spot30dVol: "0.00000000",
+    futures30dVol: "0.00000000",
     vipLevel: "0",
-    spot30dVol: "0",
-    futures30dVol: "0",
-    ...(overrides.data || {}),
+    ...rest,
+    "SHA256($.data.userId)": userId,
   };
   return {
     recipient,
     request: { url: overrides.url || SOURCE_URL, header: "", method: "GET", body: "" },
     reponseResolve: overrides.fields || FIELDS,
     data: overrides.rawData ?? JSON.stringify(data),
-    attConditions: JSON.stringify([[{ field: "userId", op: "SHA256" }]]),
+    attConditions: JSON.stringify([
+      { op: "SHA256", field: "$.data.userId", reveal_id: "userId" },
+      { op: "REVEAL_STRING", field: "$.data.vipLevel", reveal_id: "vipLevel" },
+      { op: "REVEAL_STRING", field: "$.data.spot30dVol", reveal_id: "spot30dVol" },
+      { op: "REVEAL_STRING", field: "$.data.futures30dVol", reveal_id: "futures30dVol" },
+    ]),
     timestamp: overrides.timestampMs ?? now * 1000n,
     additionParams: "",
     attestors: [{ attestorAddr: ethers.ZeroAddress, url: "https://primuslabs.xyz" }],
@@ -97,7 +104,7 @@ describe("Apostille", () => {
 
     it("accepts bare (unquoted) numeric values and a 0x-prefixed hash", async () => {
       const { apostille, alice } = await loadFixture(deploy);
-      const rawData = `{"userId":"0x${ACCOUNT_A}","vipLevel":1,"spot30dVol":0,"futures30dVol":2000000}`;
+      const rawData = `{"SHA256($.data.userId)":"0x${ACCOUNT_A}","vipLevel":1,"spot30dVol":0,"futures30dVol":2000000}`;
       await apostille.connect(alice).seal(await attestation(alice.address, { rawData }));
       const s = await apostille.sealOf(alice.address);
       expect(s.tier).to.equal(1);
@@ -152,11 +159,19 @@ describe("Apostille", () => {
         .withArgs("futures30dVol");
     });
 
-    it("rejects a raw (unhashed) Binance user id", async () => {
+    it("rejects a malformed account hash", async () => {
       const { apostille, alice } = await loadFixture(deploy);
       await expect(
         apostille.connect(alice).seal(await attestation(alice.address, { data: { userId: "254280126" } }))
       ).to.be.revertedWithCustomError(apostille, "InvalidHex");
+    });
+
+    it("rejects a proof that reveals the raw user id instead of hashing it", async () => {
+      const { apostille, alice } = await loadFixture(deploy);
+      const rawData = JSON.stringify({ spot30dVol: "0", futures30dVol: "0", vipLevel: "0", userId: "254280126" });
+      await expect(apostille.connect(alice).seal(await attestation(alice.address, { rawData })))
+        .to.be.revertedWithCustomError(apostille, "KeyNotFound")
+        .withArgs("SHA256($.data.userId)");
     });
 
     it("rejects stale attestations", async () => {

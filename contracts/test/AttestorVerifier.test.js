@@ -36,10 +36,10 @@ async function signed(attestorKey, recipient, data) {
     recipient,
     request: { url: SOURCE_URL, header: "", method: "GET", body: "" },
     reponseResolve: FIELDS,
-    data: JSON.stringify({ userId: "c".repeat(64), vipLevel: "2", spot30dVol: "100", futures30dVol: "12000000", ...data }),
-    attConditions: JSON.stringify([{ op: "SHA256", field: "userId" }]),
+    data: JSON.stringify({ spot30dVol: "100.00000000", futures30dVol: "12000000.00000000", vipLevel: "2", "SHA256($.data.userId)": "c".repeat(64), ...data }),
+    attConditions: JSON.stringify([{ op: "SHA256", field: "$.data.userId", reveal_id: "userId" }]),
     timestamp: now * 1000n,
-    additionParams: "",
+    additionParams: JSON.stringify({ algorithmType: "proxytls" }),
     attestors: [{ attestorAddr: attestorKey.address, url: "https://primuslabs.xyz" }],
     signatures: [],
   };
@@ -78,7 +78,7 @@ describe("AttestorVerifier", () => {
   it("rejects any tampering with the signed payload", async () => {
     const { verifier, attestor, alice } = await loadFixture(deploy);
     const att = await signed(attestor, alice.address);
-    const tampered = { ...att, data: att.data.replace('"futures30dVol":"12000000"', '"futures30dVol":"999000000"') };
+    const tampered = { ...att, data: att.data.replace('"futures30dVol":"12000000.00000000"', '"futures30dVol":"999000000.00000000"') };
     await expect(verifier.verifyAttestation(tampered)).to.be.revertedWithCustomError(verifier, "UnknownAttestor");
   });
 

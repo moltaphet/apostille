@@ -104,7 +104,9 @@ btnDeploy.addEventListener("click", async () => {
   try {
     await ensureChain();
     const signer = await new BrowserProvider(window.ethereum).getSigner();
-    const verifier = await deployVerifier(signer);
+    // Reuse an existing verifier when it already trusts the SDK attestor: one transaction instead of two.
+    const known = D.existingVerifier?.[CHAIN.chainId];
+    const verifier = known && (await acceptsSdk(known)) ? known : await deployVerifier(signer);
     btnDeploy.textContent = "Confirm the Apostille deployment…";
     const factory = new ContractFactory(artifact.abi, artifact.bytecode, signer);
     const tiers = D.tiers.map((t) => ({ ...t, minFuturesVolume: BigInt(t.minFuturesVolume) }));
