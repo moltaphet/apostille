@@ -34,6 +34,9 @@ export default defineConfig(({ mode }) => {
     // The Primus SDK is CommonJS and expects a Node-style `global`.
     optimizeDeps: { include: ["@primuslabs/zktls-js-sdk", "ethers"] },
     define: { global: "globalThis" },
-    build: { target: "es2022" },
+    build: {
+      target: "es2022",
+      rollupOptions: { input: { main: "index.html", deploy: "deploy.html" } },
+    },
   };
 });

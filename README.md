@@ -118,12 +118,15 @@ prerequisites: node 18+, the [Primus extension](https://chromewebstore.google.co
 
 **1. contracts**
 
+easiest: open `/deploy` on the running site, connect a wallet on BSC testnet and sign one transaction. no private key needed. or from the command line:
+
 ```bash
 cd contracts
 npm install
 npm test                      # 26 tests
 cp .env.example .env          # add DEPLOYER_PRIVATE_KEY
 npm run deploy:bsc-testnet    # writes deployments/97.json
+npm run export:frontend       # refresh the bytecode used by /deploy after contract changes
 ```
 
 **2. app (frontend + signer)**

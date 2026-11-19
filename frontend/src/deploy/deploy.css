@@ -1,0 +1,14 @@
+.nav { justify-content: space-between; }
+.deploy { max-width: 46rem; padding: clamp(3rem, 7vw, 5rem) var(--gutter) 5rem; }
+.deploy h1 { max-width: none; font-size: clamp(3rem, 6vw, 4.6rem); }
+.deploy .lede { margin-bottom: 2rem; }
+.params { margin: 0 0 2rem; border-top: 1.5px solid var(--ink); }
+.params div { display: grid; grid-template-columns: 13rem 1fr; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid rgba(23, 50, 74, 0.18); }
+.params dt { color: var(--ink-soft); font-size: 0.95rem; }
+.params dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; white-space: pre-line; }
+.deploy .btn-ink { width: 100%; }
+.result { margin-top: 2.5rem; padding: 1.5rem 1.75rem; border-left: 3px solid var(--ok); background: rgba(46, 107, 79, 0.08); }
+.result h2 { font: 900 2.2rem/1 var(--display); margin: 0 0 0.75rem; color: var(--ok); }
+.result p { margin: 0.4rem 0; }
+.address code { font-size: 1.05rem; font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .params div { grid-template-columns: 1fr; gap: 0.2rem; } }
