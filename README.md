@@ -2,7 +2,7 @@
 
 **carry your exchange tier on-chain.**
 
-[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45)
+[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x7EDa50410744a3e2B10a82016d8767f911cFD0B2)
 
 apostille lets a trader prove their Binance VIP level and 30-day trading volume with a [Primus](https://primuslabs.xyz) zkTLS attestation, and turns it into an on-chain seal any protocol can read in one call. the Binance user id never reaches the chain: it is SHA256-hashed inside the proof and used as a nullifier, so one exchange account backs exactly one wallet.
 
@@ -197,7 +197,7 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 
 | network | apostille | verifier |
 |---|---|---|
-| BNB Smart Chain testnet (97) | [`0x13dC…Ac45`](https://testnet.bscscan.com/address/0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
+| BNB Smart Chain testnet (97) | [`0x7EDa…D0B2`](https://testnet.bscscan.com/address/0x7EDa50410744a3e2B10a82016d8767f911cFD0B2) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
 
 ## roadmap
 
