@@ -118,12 +118,13 @@ function renderCertificate(seal, status, { animate = false } = {}) {
   const seed = has ? seal.accountHash : account || ZERO_HASH;
   const name = has ? tiers[tier]?.name ?? `Tier ${tier}` : "Specimen";
   const micro = has
-    ? `APOSTILLE ${name.toUpperCase()} SEAL  VIP ${seal.vipLevel}  ${seal.accountHash.slice(2, 18).toUpperCase()}`
-    : "APOSTILLE  NOT VALID UNTIL SEALED  BNB SMART CHAIN";
+    ? `APOSTILLE ${name.toUpperCase()} SEAL VIP ${seal.vipLevel} ${seal.accountHash.slice(2, 18).toUpperCase()}`
+    : "APOSTILLE SPECIMEN NOT VALID UNTIL SEALED";
   drawRosette(rosette, { seed, tier, microtext: micro });
 
-  $("tier-numeral").textContent = has ? roman(tier) : "–";
-  $("cert-title").textContent = has ? `${name} seal` : "Unsealed";
+  $("tier-numeral").textContent = has ? roman(tier) : "";
+  $("tier-numeral").hidden = !has;
+  $("cert-title").textContent = has ? `${name} seal` : "Specimen";
 
   $("cert-status").textContent = !account
     ? "Connect a wallet to see its seal."

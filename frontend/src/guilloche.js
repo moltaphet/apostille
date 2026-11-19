@@ -99,10 +99,13 @@ export function drawRosette(svg, { seed = "0x0", tier = 0, microtext = "" }) {
   el("circle", { cx: c, cy: c, r: 92, class: "g-foil" }, svg);
   el("circle", { cx: c, cy: c, r: 92, class: "g-foil-ring" }, svg);
 
-  // Microprinting around the rim.
+  // Microprinting around the rim, stretched to exactly one lap so the ends meet cleanly.
   if (microtext) {
+    const circumference = 2 * Math.PI * 262;
+    const unit = microtext.trim() + " \u2022 ";
+    const reps = Math.max(1, Math.round(circumference / (unit.length * 6.2)));
     const text = el("text", { class: "g-micro" }, svg);
-    const tp = el("textPath", { href: "#rim" }, text);
-    tp.textContent = (microtext + "   ").repeat(14);
+    const tp = el("textPath", { href: "#rim", textLength: circumference.toFixed(1), lengthAdjust: "spacing" }, text);
+    tp.textContent = unit.repeat(reps);
   }
 }
