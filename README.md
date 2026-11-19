@@ -90,7 +90,7 @@ also available: `sealOf(address)` for the full record (VIP level, volumes, expir
 
 what the contract enforces, on top of Primus's attestor-signature check (which, by itself, does not check freshness, source or recipient):
 
-- **attestor signature**: `IPrimusZKTLS.verifyAttestation` against the official Primus verifier on BSC.
+- **attestor signature**: `IPrimusZKTLS.verifyAttestation`. Primus's shared verifier on BSC testnet doesn't list the enterprise SDK's attestor (`0x5Ed3…c14d`), so apostille ships `AttestorVerifier`: same encoding as `PrimusZKTLS`, same raw-ECDSA scheme, owner-managed attestor set. it is tested against real signatures, and an existing apostille can switch to it with `setPrimus`.
 - **recipient binding**: `attestation.recipient` must equal `msg.sender`, so a proof seen in the mempool is useless to anyone else.
 - **source pinning**: the request url must be the `vip-fee-summary` endpoint (exact match or with a query string; no path suffixes).
 - **field pinning**: every revealed field must come from its expected json path, so a template can't map `futures30dVol` onto a different number in the same response.
@@ -106,7 +106,7 @@ the signer (`frontend/api/sign.js`) is the off-chain half: it only signs request
 ## repository
 
 ```
-contracts/            Apostille.sol, FlatJson parser, Primus interface, hardhat tests + deploy scripts
+contracts/            Apostille.sol, AttestorVerifier.sol, FlatJson parser, Primus interface, hardhat tests + deploy scripts
 frontend/             vite dapp: connect, prove, seal, certificate view, live tier table
 frontend/api/sign.js  vercel function that holds the Primus app secret and signs requests
 frontend/lib/         signer policy shared by the function and local dev
@@ -123,7 +123,7 @@ easiest: open `/deploy` on the running site, connect a wallet on BSC testnet and
 ```bash
 cd contracts
 npm install
-npm test                      # 26 tests
+npm test                      # 34 tests
 cp .env.example .env          # add DEPLOYER_PRIVATE_KEY
 npm run deploy:bsc-testnet    # writes deployments/97.json
 npm run export:frontend       # refresh the bytecode used by /deploy after contract changes
@@ -144,9 +144,9 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 
 ## deployments
 
-| network | contract | Primus verifier |
+| network | apostille | verifier |
 |---|---|---|
-| BNB Smart Chain testnet (97) | _pending_ | [`0x4620…91fb`](https://testnet.bscscan.com/address/0x4620362a803f82b7231b18e09abc5d400a7891fb) |
+| BNB Smart Chain testnet (97) | [`0x2d4a…9728`](https://testnet.bscscan.com/address/0x2d4a5728Ee2d43da19167aC33D0F047A877e9728) | switching to `AttestorVerifier` |
 
 ## roadmap
 

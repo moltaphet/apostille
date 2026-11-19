@@ -5,6 +5,7 @@ const path = require("path");
 const TIERS = require("../config/tiers");
 
 const art = require("../artifacts/contracts/Apostille.sol/Apostille.json");
+const verifier = require("../artifacts/contracts/AttestorVerifier.sol/AttestorVerifier.json");
 const out = path.join(__dirname, "..", "..", "frontend", "src", "deploy", "apostille.artifact.json");
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(
@@ -15,11 +16,14 @@ fs.writeFileSync(
       compiler: "solc 0.8.24, optimizer 500 runs, viaIR",
       abi: art.abi,
       bytecode: art.bytecode,
+      verifier: { abi: verifier.abi, bytecode: verifier.bytecode },
       defaults: {
         maxAttestationAge: 15 * 60,
         sealValidity: 30 * 24 * 60 * 60,
         tiers: TIERS.map((t) => ({ ...t, minFuturesVolume: t.minFuturesVolume.toString() })),
         primusVerifier: { 97: "0x4620362a803f82b7231b18e09abc5d400a7891fb" },
+        // Signs attestations from @primuslabs/zktls-js-sdk (PADOADDRESSMAP.production).
+        enterpriseAttestor: "0x5Ed3176045F68617B0958a61ac1868875C98C14d",
       },
     },
     null,

@@ -27,7 +27,7 @@
       <dl class="params" id="params">
         <div><dt>Network</dt><dd>BNB Smart Chain testnet (97)</dd></div>
         <div><dt>Owner</dt><dd id="p-owner">Connect a wallet</dd></div>
-        <div><dt>Primus verifier</dt><dd id="p-primus" class="hash">–</dd></div>
+        <div><dt>Verifier</dt><dd>A new AttestorVerifier you own, trusting Primus's enterprise attestor <span id="p-attestor" class="hash"></span></dd></div>
         <div><dt>Proof must be newer than</dt><dd id="p-age">–</dd></div>
         <div><dt>Seal lasts</dt><dd id="p-validity">–</dd></div>
         <div><dt>Tiers</dt><dd id="p-tiers">–</dd></div>
@@ -35,6 +35,7 @@
       </dl>
 
       <button id="btn-deploy" class="btn btn-ink" type="button" disabled>Deploy Apostille</button>
+      <p class="flow-hint">Two transactions: the verifier, then Apostille pointing at it.</p>
       <div class="notice" id="notice" role="status" hidden></div>
 
       <section class="result" id="result" hidden>
@@ -45,6 +46,25 @@
           <a id="addr-link" target="_blank" rel="noopener">Open on BscScan</a>.
           Add this address to Vercel as <code>VITE_APOSTILLE_ADDRESS</code>, then redeploy the site.
         </p>
+      </section>
+
+      <section class="existing" id="existing">
+        <h2>Already deployed?</h2>
+        <p>
+          Check that an existing Apostille accepts proofs from the Primus SDK. If it doesn't, you (as owner) can
+          deploy a verifier and switch the contract to it without redeploying.
+        </p>
+        <div class="row">
+          <label for="existing-addr">Apostille address</label>
+          <input id="existing-addr" class="field" placeholder="0x…" spellcheck="false" autocomplete="off" />
+          <button id="btn-check" class="btn btn-outline" type="button">Check</button>
+        </div>
+        <dl class="params" id="check-out" hidden>
+          <div><dt>Owner</dt><dd id="c-owner">–</dd></div>
+          <div><dt>Verifier</dt><dd id="c-verifier" class="hash">–</dd></div>
+          <div><dt>Accepts SDK proofs</dt><dd id="c-accepts">–</dd></div>
+        </dl>
+        <button id="btn-switch" class="btn btn-ink" type="button" hidden>Deploy verifier and switch</button>
       </section>
     </main>
 

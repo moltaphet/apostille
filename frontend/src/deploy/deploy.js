@@ -5,13 +5,14 @@ import "@fontsource/big-shoulders-display/700";
 import "@fontsource/big-shoulders-display/900";
 import "../style.css";
 import "./deploy.css";
-import { BrowserProvider, ContractFactory, formatEther } from "ethers";
+import { BrowserProvider, Contract, ContractFactory, JsonRpcProvider, formatEther, isAddress } from "ethers";
 import { ensureChain, WRONG_CHAIN_TEXT } from "../wallet.js";
 import { CHAIN } from "../config.js";
 import artifact from "./apostille.artifact.json";
 
 const D = artifact.defaults;
-const PRIMUS = D.primusVerifier[CHAIN.chainId];
+const ATTESTOR = D.enterpriseAttestor;
+const read = new JsonRpcProvider(CHAIN.params.rpcUrls[0], CHAIN.chainId, { staticNetwork: true });
 
 // ── state & DOM ─────────────────────────────────────────────────────────
 let account = "";
@@ -31,7 +32,7 @@ function showNotice(text, kind = "error") {
 }
 
 // ── static params ───────────────────────────────────────────────────────
-$("p-primus").textContent = PRIMUS;
+$("p-attestor").textContent = ATTESTOR;
 $("p-age").textContent = `${D.maxAttestationAge / 60} minutes`;
 $("p-validity").textContent = `${D.sealValidity / 86400} days`;
 $("p-tiers").textContent = D.tiers
@@ -52,12 +53,8 @@ async function refresh() {
     return showNotice(WRONG_CHAIN_TEXT);
   }
   const provider = new BrowserProvider(window.ethereum);
-  const [bal, code] = await Promise.all([provider.getBalance(account), provider.getCode(PRIMUS)]);
+  const bal = await provider.getBalance(account);
   $("p-balance").textContent = `${Number(formatEther(bal)).toFixed(4)} tBNB`;
-  if (code === "0x") {
-    btnDeploy.disabled = true;
-    return showNotice("The Primus verifier has no code on this network. Make sure your wallet is on BNB Smart Chain testnet.");
-  }
   if (bal === 0n) {
     btnDeploy.disabled = true;
     return showNotice("This wallet has no tBNB for gas. Get some from the BNB Chain testnet faucet, then reconnect.");
@@ -84,6 +81,7 @@ btnConnect.addEventListener("click", async () => {
       return;
     }
     await refresh();
+    if (addrInput.value) check();
   } catch (err) {
     showNotice((err?.code === -32002 || /already (processing|pending)/i.test(err?.message || "")) ? PENDING_TEXT : err?.shortMessage || err?.message || String(err));
     if (!account) btnConnect.textContent = "Connect wallet";
@@ -106,10 +104,12 @@ btnDeploy.addEventListener("click", async () => {
   try {
     await ensureChain();
     const signer = await new BrowserProvider(window.ethereum).getSigner();
+    const verifier = await deployVerifier(signer);
+    btnDeploy.textContent = "Confirm the Apostille deployment…";
     const factory = new ContractFactory(artifact.abi, artifact.bytecode, signer);
     const tiers = D.tiers.map((t) => ({ ...t, minFuturesVolume: BigInt(t.minFuturesVolume) }));
-    const contract = await factory.deploy(account, PRIMUS, D.maxAttestationAge, D.sealValidity, tiers);
-    btnDeploy.textContent = "Deploying…";
+    const contract = await factory.deploy(account, verifier, D.maxAttestationAge, D.sealValidity, tiers);
+    btnDeploy.textContent = "Deploying Apostille…";
     showNotice(`Transaction sent: ${contract.deploymentTransaction().hash}`, "ok");
     await contract.waitForDeployment();
     const address = await contract.getAddress();
@@ -131,3 +131,91 @@ $("btn-copy").addEventListener("click", async () => {
   await navigator.clipboard.writeText($("addr").textContent);
   $("btn-copy").textContent = "Copied";
 });
+
+// ── verifier ────────────────────────────────────────────────────────────
+async function deployVerifier(signer) {
+  const f = new ContractFactory(artifact.verifier.abi, artifact.verifier.bytecode, signer);
+  const v = await f.deploy(account, [ATTESTOR]);
+  showNotice(`Verifier transaction sent: ${v.deploymentTransaction().hash}`, "ok");
+  await v.waitForDeployment();
+  return v.getAddress();
+}
+
+const OWNER_ABI = ["function owner() view returns (address)", "function primus() view returns (address)", "function setPrimus(address)"];
+const btnCheck = $("btn-check");
+const btnSwitch = $("btn-switch");
+const addrInput = $("existing-addr");
+addrInput.value = new URLSearchParams(location.search).get("apostille") || import.meta.env.VITE_APOSTILLE_ADDRESS || "";
+
+/** Does `verifier` accept signatures from the SDK's attestor? Works for both our
+ *  AttestorVerifier (isAttestor) and Primus's PrimusZKTLS (_attestors list). */
+async function acceptsSdk(verifier) {
+  const v = new Contract(verifier, ["function isAttestor(address) view returns (bool)", "function _attestors(uint256) view returns (address,string)"], read);
+  try {
+    return await v.isAttestor(ATTESTOR);
+  } catch (_) {}
+  for (let i = 0; i < 32; i++) {
+    try {
+      const [a] = await v._attestors(i);
+      if (a.toLowerCase() === ATTESTOR.toLowerCase()) return true;
+    } catch (_) {
+      return false;
+    }
+  }
+  return false;
+}
+
+async function check() {
+  btnSwitch.hidden = true;
+  const addr = addrInput.value.trim();
+  if (!isAddress(addr)) return showNotice("Enter a valid contract address.");
+  btnCheck.disabled = true;
+  btnCheck.textContent = "Checking…";
+  try {
+    const c = new Contract(addr, OWNER_ABI, read);
+    const [owner, verifier] = await Promise.all([c.owner(), c.primus()]);
+    const ok = await acceptsSdk(verifier);
+    $("check-out").hidden = false;
+    $("c-owner").textContent = owner;
+    $("c-verifier").textContent = verifier;
+    $("c-accepts").innerHTML = ok
+      ? '<span class="yes">Yes. Proofs from the Primus SDK will verify.</span>'
+      : '<span class="no">No. Seal transactions will fail with "Invalid signature".</span>';
+    const isOwner = account && owner.toLowerCase() === account.toLowerCase();
+    btnSwitch.hidden = ok;
+    btnSwitch.disabled = !isOwner;
+    if (!ok && !isOwner) showNotice(account ? "Only the contract owner can switch its verifier. Connect the owner wallet." : "Connect the owner wallet to fix this.");
+    else showNotice("");
+  } catch (err) {
+    showNotice(`That address doesn't look like an Apostille contract on BSC testnet. (${err?.shortMessage || err?.message})`);
+  } finally {
+    btnCheck.disabled = false;
+    btnCheck.textContent = "Check";
+  }
+}
+
+btnCheck.addEventListener("click", check);
+
+btnSwitch.addEventListener("click", async () => {
+  btnSwitch.disabled = true;
+  try {
+    await ensureChain();
+    const signer = await new BrowserProvider(window.ethereum).getSigner();
+    btnSwitch.textContent = "Confirm the verifier deployment…";
+    const verifier = await deployVerifier(signer);
+    btnSwitch.textContent = "Confirm the switch…";
+    const tx = await new Contract(addrInput.value.trim(), OWNER_ABI, signer).setPrimus(verifier);
+    showNotice(`Switching: ${tx.hash}`, "ok");
+    await tx.wait();
+    showNotice(`Done. Apostille now verifies with ${verifier}.`, "ok");
+    btnSwitch.textContent = "Deploy verifier and switch";
+    await check();
+  } catch (err) {
+    console.error(err);
+    showNotice(err?.code === "ACTION_REJECTED" ? "You cancelled the transaction." : err?.shortMessage || err?.message || String(err));
+    btnSwitch.textContent = "Deploy verifier and switch";
+    btnSwitch.disabled = false;
+  }
+});
+
+if (addrInput.value) check();
