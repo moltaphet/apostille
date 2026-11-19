@@ -280,6 +280,9 @@ btnProve.addEventListener("click", async () => {
     const attestation = await primus.startAttestation(body.signResult);
     if (!(await primus.verifyAttestation(attestation))) throw new Error("The attestation signature didn't verify.");
     setStep("prove", "done");
+    // Kept for support/debugging: holds only the hashed UID and the attested tier numbers.
+    window.__apostille = { attestation };
+    console.info("apostille: attestation data", attestation.data, "conditions", attestation.attConditions);
 
     // 3. Submit to Apostille.
     stage = "seal";
