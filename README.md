@@ -2,6 +2,8 @@
 
 **carry your exchange tier on-chain.**
 
+[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x2d4a5728Ee2d43da19167aC33D0F047A877e9728)
+
 apostille lets a trader prove their Binance VIP level and 30-day trading volume with a [Primus](https://primuslabs.xyz) zkTLS attestation, and turns it into an on-chain seal any protocol can read in one call. the Binance user id never reaches the chain: it is SHA256-hashed inside the proof and used as a nullifier, so one exchange account backs exactly one wallet.
 
 > an apostille is the certificate that makes a document issued in one country valid in another. this one makes your standing on a centralized exchange valid on-chain.
