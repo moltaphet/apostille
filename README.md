@@ -2,7 +2,7 @@
 
 **carry your exchange tier on-chain.**
 
-[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45)
+[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x7EDa50410744a3e2B10a82016d8767f911cFD0B2)
 
 apostille lets a trader prove their Binance VIP level and 30-day trading volume with a [Primus](https://primuslabs.xyz) zkTLS attestation, and turns it into an on-chain seal any protocol can read in one call. the Binance user id never reaches the chain: it is SHA256-hashed inside the proof and used as a nullifier, so one exchange account backs exactly one wallet.
 
@@ -129,6 +129,13 @@ const { fee } = feeOn(notional, 500n, tier, 5000);
 
 also available: `sealOf(address)` for the full record (VIP level, volumes, expiry, uid hash), `tiers()`, `previewTier(vip, volume)`, and the `Sealed` / `Released` events for indexers.
 
+## governance
+
+- **owner = a timelock.** `contracts/scripts/govern.js` puts Apostille and its verifier behind an OpenZeppelin `TimelockController` (48h by default). every change to the verifier, tiers, windows or sources is queued on-chain for the delay, so users and integrators can see it coming, and the proposer can cancel it
+- **guardian = brakes only.** a separate key can `pause()` new seals and `disableSource(id)` immediately. it can't unpause, re-enable or change anything. existing seals keep working while paused
+
+see [SECURITY.md](SECURITY.md) for the threat model, trust assumptions and the static-analysis triage.
+
 ## security model
 
 what the contract enforces, on top of Primus's attestor-signature check (which, by itself, does not check freshness, source or recipient):
@@ -138,6 +145,7 @@ what the contract enforces, on top of Primus's attestor-signature check (which, 
 - **source pinning**: the request url must be the `vip-fee-summary` endpoint (exact match or with a query string; no path suffixes).
 - **field pinning**: every revealed field must come from its expected json path, so a template can't map `futures30dVol` onto a different number in the same response.
 - **hashed identity**: `userId` must be a 32-byte hash. a raw uid fails to parse and the transaction reverts.
+- **payload shape**: `data` must be one `{…}` object and `attConditions` one `[…]` array. Primus signs `abi.encodePacked` over consecutive strings, so this stops bytes being shifted from one field into the next without breaking the signature (flagged by Slither, covered by a test)
 - **freshness**: the attestation must be at most 15 minutes old and not from the future (5 min clock drift).
 - **replay protection**: each uid hash only accepts attestations newer than the last one it used.
 - **one account, one wallet**: a uid hash bound to a wallet with an active seal can't be used by another wallet. it frees up when the seal expires or the holder calls `release()`.
@@ -166,7 +174,7 @@ easiest: open `/deploy` on the running site, connect a wallet on BSC testnet and
 ```bash
 cd contracts
 npm install
-npm test                      # 52 tests
+npm test                      # 62 tests
 cp .env.example .env          # add DEPLOYER_PRIVATE_KEY
 npm run deploy:bsc-testnet    # writes deployments/97.json
 npm run export:frontend       # refresh the bytecode used by /deploy after contract changes
@@ -189,7 +197,7 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 
 | network | apostille | verifier |
 |---|---|---|
-| BNB Smart Chain testnet (97) | [`0x13dC…Ac45`](https://testnet.bscscan.com/address/0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
+| BNB Smart Chain testnet (97) | [`0x7EDa…D0B2`](https://testnet.bscscan.com/address/0x7EDa50410744a3e2B10a82016d8767f911cFD0B2) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
 
 ## roadmap
 

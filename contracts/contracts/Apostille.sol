@@ -74,6 +74,11 @@ contract Apostille is Ownable2Step {
     bytes32 private constant OP_GT = keccak256(">");
 
     IPrimusZKTLS public primus;
+
+    /// @notice May only stop things (pause sealing, disable a source), never start or change them.
+    ///         Meant to be a fast-acting key while the owner sits behind a timelock.
+    address public guardian;
+    bool public paused;
     uint64 public maxAttestationAge;
     uint64 public sealValidity;
 
@@ -105,6 +110,9 @@ contract Apostille is Ownable2Step {
     event SourceEnabled(uint8 indexed id, bool enabled);
     event PrimusUpdated(address primus);
     event WindowsUpdated(uint64 maxAttestationAge, uint64 sealValidity);
+    event GuardianUpdated(address guardian);
+    event Paused(address by);
+    event Unpaused(address by);
 
     error RecipientMismatch(address recipient, address caller);
     error UnexpectedSource(string url);
@@ -121,6 +129,9 @@ contract Apostille is Ownable2Step {
     error InvalidSource();
     error InvalidWindow();
     error ZeroAddress();
+    error NotGuardian(address caller);
+    error SealingPaused();
+    error MalformedPayload();
 
     // ---------------------------------------------------------------------
     // Construction & admin
@@ -158,6 +169,31 @@ contract Apostille is Ownable2Step {
         return _addSource(source);
     }
 
+    function setGuardian(address guardian_) external onlyOwner {
+        guardian = guardian_;
+        emit GuardianUpdated(guardian_);
+    }
+
+    /// @notice Stops new seals. Existing seals keep working for integrators until they expire.
+    function pause() external {
+        if (msg.sender != guardian && msg.sender != owner()) revert NotGuardian(msg.sender);
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    /// @notice Emergency brake for a single source, e.g. if an exchange changes its endpoint.
+    function disableSource(uint8 id) external {
+        if (msg.sender != guardian && msg.sender != owner()) revert NotGuardian(msg.sender);
+        if (id >= _sources.length) revert InvalidSource();
+        _sources[id].enabled = false;
+        emit SourceEnabled(id, false);
+    }
+
     function setSourceEnabled(uint8 id, bool enabled) external onlyOwner {
         if (id >= _sources.length) revert InvalidSource();
         _sources[id].enabled = enabled;
@@ -171,8 +207,15 @@ contract Apostille is Ownable2Step {
     /// @notice Verifies a Primus attestation of the caller's exchange standing and issues
     ///         (or renews) the caller's seal.
     function seal(Attestation calldata att) external returns (Seal memory s) {
+        if (paused) revert SealingPaused();
+
         // 1. Signature from a trusted attestor (reverts on failure).
         primus.verifyAttestation(att);
+
+        // Primus signs abi.encodePacked over consecutive strings, so field boundaries are not
+        // part of the signature. Pin the shapes that delimit them (data is one object, the
+        // conditions one array) so bytes can't be shifted from one field into its neighbour.
+        _checkShape(att.data, att.attConditions);
 
         // 2. Bound to the caller, so a proof can't be lifted from the mempool.
         if (att.recipient != msg.sender) revert RecipientMismatch(att.recipient, msg.sender);
@@ -353,6 +396,13 @@ contract Apostille is Ownable2Step {
             bytes32 p = keccak256(bytes(fields[i].parsePath));
             if (p != id && p != vip && p != spot && p != fut) revert UnexpectedField(fields[i].parsePath);
         }
+    }
+
+    function _checkShape(string calldata data, string calldata conds) private pure {
+        bytes calldata d = bytes(data);
+        if (d.length < 2 || d[0] != "{" || d[d.length - 1] != "}") revert MalformedPayload();
+        bytes calldata c = bytes(conds);
+        if (c.length != 0 && (c.length < 2 || c[0] != "[" || c[c.length - 1] != "]")) revert MalformedPayload();
     }
 
     function _checkFreshness(uint64 timestampMs) private view returns (uint64 issuedAt) {

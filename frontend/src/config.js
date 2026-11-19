@@ -4,7 +4,7 @@ export const CONFIG = {
   templateId: import.meta.env.VITE_PRIMUS_TEMPLATE_ID || "9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e",
   signerUrl: (import.meta.env.VITE_SIGNER_URL || "/api").replace(/\/$/, ""),
   // Public testnet deployment; override with VITE_APOSTILLE_ADDRESS.
-  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45",
+  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x7EDa50410744a3e2B10a82016d8767f911cFD0B2",
 };
 
 export const CHAIN = {
@@ -40,6 +40,8 @@ export const APOSTILLE_ABI = [
   "error AccountBoundElsewhere(address wallet)",
   "error NoActiveSeal(address wallet)",
   "error KeyNotFound(string key)",
+  "error SealingPaused()",
+  "error MalformedPayload()",
   "error InvalidNumber(string value)",
   "error InvalidHex(string value)",
 ];
@@ -58,4 +60,6 @@ export const ERROR_TEXT = {
   IdNotHashed: "The Binance user ID wasn't hashed in this proof. Start the proof again.",
   MissingField: "The proof is missing a field Apostille needs. Start the proof again.",
   UnsupportedCondition: "The proof uses a condition Apostille doesn't accept.",
+  SealingPaused: "New seals are paused right now. Existing seals still work. Try again later.",
+  MalformedPayload: "The proof's data isn't in the shape Apostille expects. Start the proof again.",
 };
