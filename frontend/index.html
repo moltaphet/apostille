@@ -19,6 +19,7 @@
       <nav aria-label="Sections">
         <a href="#ladder">Tiers</a>
         <a href="#integrate">For protocols</a>
+        <a href="/perp">Perp demo</a>
         <a href="https://github.com/moltaphet/apostille" target="_blank" rel="noopener">Source</a>
       </nav>
       <button id="btn-connect" class="btn btn-outline" type="button">Connect wallet</button>
@@ -34,13 +35,28 @@
           </p>
 
           <div class="flow" id="flow" data-open="false">
+            <fieldset class="mode">
+              <legend>What goes on-chain</legend>
+              <label class="mode-opt">
+                <input type="radio" name="mode" value="revealed" checked />
+                <span><b>Exact figures</b><small>Your VIP level and 30-day volumes are recorded as they are.</small></span>
+              </label>
+              <label class="mode-opt">
+                <input type="radio" name="mode" value="concealed" />
+                <span><b>Only my tier</b><small>The proof only says you clear a tier's bar. Your real volume stays in your browser.</small></span>
+              </label>
+              <label class="target" id="target-wrap" hidden>
+                Tier to prove
+                <select id="target-tier"></select>
+              </label>
+            </fieldset>
             <button id="btn-prove" class="btn btn-ink" type="button" disabled>Prove my Binance tier</button>
             <p class="flow-hint" id="hint">Connect a wallet on BNB Smart Chain testnet to start.</p>
 
             <ol class="steps" id="steps" aria-live="polite">
               <li data-step="sign">
                 <b>Approve the request</b>
-                <span>Apostille signs a request that hashes your Binance user ID.</span>
+                <span>Apostille signs a request that hashes your Binance user ID and sets what gets revealed.</span>
               </li>
               <li data-step="prove">
                 <b>Prove it on Binance</b>
@@ -97,7 +113,7 @@
       <section class="integrate" id="integrate" aria-labelledby="integrate-title">
         <div class="section-head">
           <h2 id="integrate-title">One call for protocols</h2>
-          <p>Replace VIP-matching tickets and screenshots with a view function. No allow-lists, no manual review.</p>
+          <p>Replace VIP-matching tickets and screenshots with a view function. No allow-lists, no manual review. <a href="/perp">See it priced at a perp exchange.</a></p>
         </div>
         <div class="integrate-grid">
 <pre class="code" tabindex="0"><code><span class="k">interface</span> IApostille {
@@ -116,6 +132,7 @@
             <li><b>Can't be forged.</b> A Primus attestor signs Binance's own API response over TLS.</li>
             <li><b>Can't be lifted.</b> Each proof names one wallet, so copying it from the mempool gets you nothing.</li>
             <li><b>Can't be farmed.</b> A hashed Binance user ID backs one wallet at a time.</li>
+            <li><b>Private when you want it.</b> Prove "my volume clears this tier" without revealing the number.</li>
             <li><b>Can't go stale.</b> Proofs older than 15 minutes are rejected, and seals expire after 30 days.</li>
           </ul>
         </div>

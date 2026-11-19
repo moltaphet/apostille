@@ -41,6 +41,10 @@ const steps = $("steps");
 const cert = $("certificate");
 const rosette = $("rosette");
 const rungs = $("rungs");
+const targetWrap = $("target-wrap");
+const targetTier = $("target-tier");
+const modeInputs = [...document.querySelectorAll('input[name="mode"]')];
+const mode = () => modeInputs.find((i) => i.checked)?.value || "revealed";
 
 // ── Primus SDK: initialise once at load (production mode, no secret) ───
 const primus = new PrimusZKTLS();
@@ -108,10 +112,10 @@ function renderCertificate(seal, status, { animate = false } = {}) {
   const tier = has ? Number(active ? status.tier : seal.tier) : 0;
   cert.dataset.state = active ? "active" : has ? "expired" : "empty";
 
-  const seed = has ? seal.accountHash : account || ZERO_HASH;
+  const seed = has ? seal.account : account || ZERO_HASH;
   const name = has ? tiers[tier]?.name ?? `Tier ${tier}` : "Specimen";
   const micro = has
-    ? `APOSTILLE ${name.toUpperCase()} SEAL VIP ${seal.vipLevel} ${seal.accountHash.slice(2, 18).toUpperCase()}`
+    ? `APOSTILLE ${name.toUpperCase()} SEAL VIP ${seal.vipLevel} ${seal.account.slice(2, 18).toUpperCase()}`
     : "APOSTILLE SPECIMEN NOT VALID UNTIL SEALED";
   drawRosette(rosette, { seed, tier, microtext: micro });
 
@@ -124,15 +128,17 @@ function renderCertificate(seal, status, { animate = false } = {}) {
     : !has
       ? "This wallet has no seal yet."
       : active
-        ? `Active. Issued ${date(seal.issuedAt)} for ${short(account)}.`
+        ? `Active. Issued ${date(seal.issuedAt)} for ${short(account)}${seal.concealed ? ", figures kept private" : ""}.`
         : `Expired on ${date(seal.expiresAt)}. Prove again to renew it.`;
 
-  $("cert-vip").textContent = has ? `VIP ${seal.vipLevel}` : "–";
-  $("cert-futures").textContent = has ? usd(seal.futures30dVolume) : "–";
-  $("cert-spot").textContent = has ? usd(seal.spot30dVolume) : "–";
+  // Concealed seals store proven floors, not real figures.
+  const floor = (v, fmt) => (Number(v) > 0 ? `≥ ${fmt(v)}` : "Private");
+  $("cert-vip").textContent = !has ? "–" : seal.concealed ? floor(seal.vipLevel, (v) => `VIP ${v}`) : `VIP ${seal.vipLevel}`;
+  $("cert-futures").textContent = !has ? "–" : seal.concealed ? floor(seal.futures30dVolume, usd) : usd(seal.futures30dVolume);
+  $("cert-spot").textContent = !has ? "–" : seal.concealed ? "Private" : usd(seal.spot30dVolume);
   $("cert-discount").textContent = active ? pct(status.discountBps) : "–";
   $("cert-expiry").textContent = has ? date(seal.expiresAt) : "–";
-  $("cert-account").textContent = has ? short(seal.accountHash) : "–";
+  $("cert-account").textContent = has ? short(seal.account) : "–";
   btnRelease.hidden = !has;
 
   if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -153,7 +159,7 @@ function renderLadder(seal = ladderState.seal, currentTier = ladderState.tier) {
   const top = Number(tiers[tiers.length - 1].minFuturesVolume) * 4;
   const lo = 1e5;
   const pos = (v) => Math.max(0, Math.min(100, ((Math.log10(Math.max(Number(v), lo)) - Math.log10(lo)) / (Math.log10(top) - Math.log10(lo))) * 100));
-  const mine = seal ? pos(seal.futures30dVolume) : null;
+  const mine = seal && !seal.concealed ? pos(seal.futures30dVolume) : null;
 
   rungs.innerHTML = tiers
     .map((t, i) => {
@@ -195,7 +201,7 @@ async function loadSeal(opts) {
   try {
     const c = readContract();
     const [seal, status] = await Promise.all([c.sealOf(account), c.tierOf(account)]);
-    renderCertificate(seal.accountHash === ZERO_HASH ? null : seal, status, opts);
+    renderCertificate(seal.account === ZERO_HASH ? null : seal, status, opts);
   } catch (err) {
     renderCertificate(null);
     showNotice(`Couldn't read this wallet's seal: ${explain(err)}`);
@@ -264,7 +270,7 @@ btnProve.addEventListener("click", async () => {
     setStep("sign", "active");
     const request = primus.generateRequestParams(CONFIG.templateId, account);
     request.setAttMode({ algorithmType: "proxytls" });
-    request.setAttConditions([[{ field: "userId", op: "SHA256" }]]);
+    request.setAttConditions(conditionsFor(mode()));
     const res = await fetch(`${CONFIG.signerUrl}/sign`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -322,6 +328,27 @@ btnRelease.addEventListener("click", async () => {
   }
 });
 
+/** Primus conditions: always hash the user id; in concealed mode reduce every figure to ">=". */
+function conditionsFor(m) {
+  const id = { field: "userId", op: "SHA256" };
+  if (m !== "concealed") return [[id]];
+  const t = tiers[Number(targetTier.value)] || tiers[1];
+  return [[
+    id,
+    { field: "vipLevel", op: ">=", value: String(t.minVipLevel) },
+    { field: "spot30dVol", op: ">=", value: "0" },
+    { field: "futures30dVol", op: ">=", value: String(t.minFuturesVolume) },
+  ]];
+}
+
+function renderTargets() {
+  targetTier.innerHTML = tiers
+    .slice(1)
+    .map((t, i) => `<option value="${i + 1}">${t.name}: VIP ${t.minVipLevel}+ or ${usd(t.minFuturesVolume)}+ futures</option>`)
+    .join("");
+}
+modeInputs.forEach((i) => i.addEventListener("change", () => (targetWrap.hidden = mode() !== "concealed")));
+
 /** Normalises the SDK's attestation object to the contract's struct shape. */
 function toStruct(a) {
   return {
@@ -340,7 +367,11 @@ function toStruct(a) {
 // ── Boot ─────────────────────────────────────────────────────────────────
 if (CONFIG.apostille) $("contract-link").href = `${CHAIN.explorer}/address/${CONFIG.apostille}`;
 renderCertificate(null);
-loadTiers().then(() => renderLadder());
+renderTargets();
+loadTiers().then(() => {
+  renderLadder();
+  renderTargets();
+});
 
 
 // Dev-only preview of a sealed certificate: append ?preview=gold (or bronze, silver, sovereign).
@@ -352,7 +383,9 @@ if (import.meta.env.DEV) {
     const now = Math.floor(Date.now() / 1000);
     renderCertificate(
       {
-        accountHash: "0x5be1c0a9d33f7e18a4b6f2c9017e3d84c5a6b9f0e21d47c8a93b5e6f708c1d2e",
+        account: "0x5be1c0a9d33f7e18a4b6f2c9017e3d84c5a6b9f0e21d47c8a93b5e6f708c1d2e",
+        source: 0,
+        concealed: new URLSearchParams(location.search).has("private"),
         vipLevel: tiers[i].minVipLevel,
         tier: i,
         issuedAt: now,

@@ -4,7 +4,7 @@ export const CONFIG = {
   templateId: import.meta.env.VITE_PRIMUS_TEMPLATE_ID || "9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e",
   signerUrl: (import.meta.env.VITE_SIGNER_URL || "/api").replace(/\/$/, ""),
   // Public testnet deployment; override with VITE_APOSTILLE_ADDRESS.
-  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x2d4a5728Ee2d43da19167aC33D0F047A877e9728",
+  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45",
 };
 
 export const CHAIN = {
@@ -21,15 +21,19 @@ export const CHAIN = {
 };
 
 export const APOSTILLE_ABI = [
-  "function seal((address recipient,(string url,string header,string method,string body) request,(string keyName,string parseType,string parsePath)[] reponseResolve,string data,string attConditions,uint64 timestamp,string additionParams,(address attestorAddr,string url)[] attestors,bytes[] signatures) att) returns ((bytes32 accountHash,uint8 vipLevel,uint8 tier,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
+  "function seal((address recipient,(string url,string header,string method,string body) request,(string keyName,string parseType,string parsePath)[] reponseResolve,string data,string attConditions,uint64 timestamp,string additionParams,(address attestorAddr,string url)[] attestors,bytes[] signatures) att) returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
   "function release()",
   "function tierOf(address wallet) view returns (bool active, uint8 tier, uint16 discountBps)",
-  "function sealOf(address wallet) view returns ((bytes32 accountHash,uint8 vipLevel,uint8 tier,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
+  "function sealOf(address wallet) view returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
   "function tiers() view returns ((string name,uint8 minVipLevel,uint128 minFuturesVolume,uint16 feeDiscountBps)[])",
-  "event Sealed(address indexed wallet, bytes32 indexed accountHash, uint8 tier, uint8 vipLevel, uint128 futures30dVolume, uint128 spot30dVolume, uint64 expiresAt)",
+  "function sources() view returns ((string name,string url,string idPath,string vipPath,string spotPath,string futuresPath,bool enabled)[])",
+  "event Sealed(address indexed wallet, bytes32 indexed account, uint8 indexed source, uint8 tier, bool concealed, uint8 vipLevel, uint128 futures30dVolume, uint128 spot30dVolume, uint64 expiresAt)",
   "error RecipientMismatch(address recipient, address caller)",
   "error UnexpectedSource(string url)",
-  "error UnexpectedField(string keyName)",
+  "error UnexpectedField(string parsePath)",
+  "error MissingField(string parsePath)",
+  "error UnsupportedCondition(string op, string parsePath)",
+  "error IdNotHashed(string parsePath)",
   "error StaleAttestation(uint64 timestampMs)",
   "error AttestationFromFuture(uint64 timestampMs)",
   "error ReplayedAttestation(uint64 timestampMs, uint64 lastTimestampMs)",
@@ -50,5 +54,8 @@ export const ERROR_TEXT = {
   ReplayedAttestation: "This proof (or a newer one) was already used for this Binance account.",
   AccountBoundElsewhere: "This Binance account already backs another wallet with an active seal.",
   NoActiveSeal: "This wallet has no seal to release.",
-  InvalidHex: "The Binance user id was not hashed. Start the proof again.",
+  InvalidHex: "The proof's account hash is malformed. Start the proof again.",
+  IdNotHashed: "The Binance user ID wasn't hashed in this proof. Start the proof again.",
+  MissingField: "The proof is missing a field Apostille needs. Start the proof again.",
+  UnsupportedCondition: "The proof uses a condition Apostille doesn't accept.",
 };

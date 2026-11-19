@@ -13,11 +13,35 @@ library FlatJson {
 
     /// @notice Returns the raw (unquoted) value for `key`. Reverts if absent.
     function get(string memory json, string memory key) internal pure returns (string memory) {
+        (bool found, string memory value) = tryGet(json, key);
+        if (!found) revert KeyNotFound(key);
+        return value;
+    }
+
+    /// @notice Splits a top-level array of flat objects, `[{...},{...}]`, into the objects.
+    /// @dev Values must not contain braces, which holds for Primus condition lists.
+    function objects(string memory json) internal pure returns (string[] memory out) {
+        bytes memory j = bytes(json);
+        uint256 count;
+        for (uint256 i; i < j.length; ++i) if (j[i] == "{") ++count;
+        out = new string[](count);
+        uint256 k;
+        for (uint256 i; i < j.length; ++i) {
+            if (j[i] != "{") continue;
+            uint256 end = i;
+            while (end < j.length && j[end] != "}") ++end;
+            out[k++] = string(_slice(j, i, end < j.length ? end + 1 : end));
+            i = end;
+        }
+    }
+
+    /// @notice Like `get`, but returns `found = false` instead of reverting.
+    function tryGet(string memory json, string memory key) internal pure returns (bool found, string memory value) {
         bytes memory j = bytes(json);
         bytes memory needle = abi.encodePacked('"', key, '"');
         uint256 n = j.length;
         uint256 m = needle.length;
-        if (m > n) revert KeyNotFound(key);
+        if (m > n) return (false, "");
 
         for (uint256 i; i + m <= n; ++i) {
             if (!_matchAt(j, needle, i)) continue;
@@ -39,9 +63,15 @@ library FlatJson {
                 end = p;
                 while (end < n && j[end] != "," && j[end] != "}" && !_isSpace(j[end])) ++end;
             }
-            return string(_slice(j, start, end));
+            return (true, string(_slice(j, start, end)));
         }
-        revert KeyNotFound(key);
+        return (false, "");
+    }
+
+    /// @notice True for "true" or "1", the forms Primus uses for a satisfied condition.
+    function isTrue(string memory value) internal pure returns (bool) {
+        bytes32 h = keccak256(bytes(value));
+        return h == keccak256("true") || h == keccak256("1");
     }
 
     /// @notice Parses a non-negative decimal (optionally with fraction and e/E exponent)

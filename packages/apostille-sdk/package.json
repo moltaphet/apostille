@@ -1,0 +1,14 @@
+{
+  "name": "@apostille/sdk",
+  "version": "0.1.0",
+  "description": "read Apostille seals and price trading fees from them",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "files": ["src"],
+  "scripts": { "test": "node --test test/*.test.js" },
+  "peerDependencies": { "ethers": "^6.7.0" },
+  "devDependencies": { "ethers": "^6.13.0" },
+  "repository": { "type": "git", "url": "https://github.com/moltaphet/apostille", "directory": "packages/apostille-sdk" }
+}

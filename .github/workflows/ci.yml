@@ -38,3 +38,16 @@ jobs:
       - run: npm run build
         env:
           VITE_PRIMUS_APP_ID: ci
+
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: compile contracts (for the ABI parity test)
+        working-directory: contracts
+        run: npm ci && npx hardhat compile
+      - working-directory: packages/apostille-sdk
+        run: npm install --no-audit --no-fund && npm test

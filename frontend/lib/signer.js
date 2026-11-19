@@ -10,8 +10,20 @@ import { isAddress } from "ethers";
 
 export const DEFAULT_TEMPLATE_ID = "9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e";
 
-// The only attestation condition Apostille accepts: hash the Binance user id.
-const REQUIRED_CONDITIONS = JSON.stringify([[{ field: "userId", op: "SHA256" }]]);
+// Revealed mode: hash the user id, reveal the rest.
+const REVEALED_CONDITIONS = JSON.stringify([[{ field: "userId", op: "SHA256" }]]);
+
+/** Concealed mode: hash the id and reduce every figure to a ">=" check against an integer. */
+function isConcealedConditions(c) {
+  if (!Array.isArray(c) || c.length !== 1 || !Array.isArray(c[0]) || c[0].length !== 4) return false;
+  const [id, vip, spot, fut] = c[0];
+  const int = (v) => typeof v === "string" && /^\d{1,15}$/.test(v);
+  const gte = (x, field) => x && x.field === field && x.op === ">=" && int(x.value) && Object.keys(x).length === 3;
+  return (
+    id?.field === "userId" && id?.op === "SHA256" && Object.keys(id).length === 2 &&
+    gte(vip, "vipLevel") && gte(spot, "spot30dVol") && gte(fut, "futures30dVol")
+  );
+}
 const MAX_REQUEST_AGE_MS = 2 * 60 * 1000;
 
 /** Returns a reason string if `req` is not an Apostille request, otherwise null. */
@@ -20,7 +32,8 @@ export function rejectReason(req, { appId, templateId }) {
   if (req.appId !== appId) return "unexpected appId";
   if (req.attTemplateID !== templateId) return "unexpected template";
   if (!isAddress(req.userAddress)) return "userAddress must be an EVM address";
-  if (JSON.stringify(req.attConditions) !== REQUIRED_CONDITIONS) return "userId must be hashed (SHA256)";
+  if (JSON.stringify(req.attConditions) !== REVEALED_CONDITIONS && !isConcealedConditions(req.attConditions))
+    return "conditions must hash userId (SHA256), optionally with >= thresholds for every figure";
   if (req.attMode?.algorithmType !== "proxytls" || req.attMode?.resultType !== "plain") return "unexpected attMode";
   if (req.computeMode && req.computeMode !== "normal") return "unexpected computeMode";
   if (req.allJsonResponseFlag && req.allJsonResponseFlag !== "false") return "full responses are not allowed";

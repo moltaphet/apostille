@@ -2,7 +2,7 @@
 
 **carry your exchange tier on-chain.**
 
-[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x2d4a5728Ee2d43da19167aC33D0F047A877e9728)
+[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45)
 
 apostille lets a trader prove their Binance VIP level and 30-day trading volume with a [Primus](https://primuslabs.xyz) zkTLS attestation, and turns it into an on-chain seal any protocol can read in one call. the Binance user id never reaches the chain: it is SHA256-hashed inside the proof and used as a nullifier, so one exchange account backs exactly one wallet.
 
@@ -60,6 +60,21 @@ using the public Primus template [`9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e`](https:
 | `spot30dVol` | `$.data.spot30dVol` | plain |
 | `futures30dVol` | `$.data.futures30dVol` | plain |
 
+## two disclosure modes
+
+each proof picks what goes on-chain, through Primus attestation conditions:
+
+| mode | what the attestation says | what's stored |
+|---|---|---|
+| exact figures | `vipLevel = 2`, `futures30dVol = 12500000.34`, … | the real numbers |
+| only my tier | `vipLevel >= 2: true`, `futures30dVol >= 10000000: true`, `spot30dVol >= 0: true` | the proven floors, flagged `concealed` |
+
+in both modes the user id is reported only as `SHA256($.data.userId)`; the contract requires that key, so a proof that revealed the raw id can't be sealed.
+
+## sources
+
+the contract is a registry of exchange endpoints (`addSource`, append-only, owner-gated). a source names the endpoint and the json paths of the id, VIP level, spot and futures volume. nullifiers are `keccak256(sourceId, SHA256(userId))`, so the same id on two exchanges is two accounts. Binance is source `0`; adding OKX, Bybit or Bitget means capturing their fee endpoint as a Primus template and registering it, with no new contract code (see `contracts/config/sources.js`).
+
 ## tiers
 
 a wallet lands in the highest tier where its VIP level **or** its 30-day futures volume clears the bar. the table lives on-chain and the owner can change it; discounts are a suggestion to integrators. apostille never moves funds.
@@ -76,6 +91,12 @@ a seal lasts 30 days (one volume window) and can be renewed anytime with a fresh
 
 ## integrate
 
+### see it
+
+[`/perp`](https://apostille-two.vercel.app/perp) is an order ticket priced the way a perp DEX would after integrating: it reads your live seal and shows your taker fee next to every other tier.
+
+### solidity
+
 ```solidity
 interface IApostille {
     function tierOf(address wallet)
@@ -84,6 +105,26 @@ interface IApostille {
 
 (bool active, , uint16 discountBps) = IApostille(APOSTILLE).tierOf(trader);
 uint256 fee = active ? baseFee * (10_000 - discountBps) / 10_000 : baseFee;
+```
+
+or use the helper library, which caps the discount and fails open (a revert or a missing registry falls back to the base fee, so trading never depends on Apostille being up):
+
+```solidity
+import {IApostille} from "apostille/contracts/integrations/IApostille.sol";
+import {ApostilleFees} from "apostille/contracts/integrations/ApostilleFees.sol";
+
+using ApostilleFees for IApostille;
+(uint256 fee, uint256 ratePips, uint8 tier) = apostille.feeOn(trader, notional, 500, 5000); // 0.05% base, max 50% off
+```
+
+`contracts/examples/DemoPerp.sol` is a complete (demo-only) venue built this way: margin, signed positions, discounted taker fees to a treasury.
+
+### javascript
+
+```js
+import { getTier, feeOn } from "@apostille/sdk"; // packages/apostille-sdk
+const tier = await getTier(provider, trader, { chainId: 97 });
+const { fee } = feeOn(notional, 500n, tier, 5000);
 ```
 
 also available: `sealOf(address)` for the full record (VIP level, volumes, expiry, uid hash), `tiers()`, `previewTier(vip, volume)`, and the `Sealed` / `Released` events for indexers.
@@ -108,7 +149,7 @@ the signer (`frontend/api/sign.js`) is the off-chain half: it only signs request
 ## repository
 
 ```
-contracts/            Apostille.sol, AttestorVerifier.sol, FlatJson parser, Primus interface, hardhat tests + deploy scripts
+contracts/            Apostille.sol, AttestorVerifier.sol, integrations/ (IApostille, ApostilleFees), examples/DemoPerp.sol, tests + deploy scripts
 frontend/             vite dapp: connect, prove, seal, certificate view, live tier table
 frontend/api/sign.js  vercel function that holds the Primus app secret and signs requests
 frontend/lib/         signer policy shared by the function and local dev
@@ -125,7 +166,7 @@ easiest: open `/deploy` on the running site, connect a wallet on BSC testnet and
 ```bash
 cd contracts
 npm install
-npm test                      # 34 tests
+npm test                      # 52 tests
 cp .env.example .env          # add DEPLOYER_PRIVATE_KEY
 npm run deploy:bsc-testnet    # writes deployments/97.json
 npm run export:frontend       # refresh the bytecode used by /deploy after contract changes
@@ -148,12 +189,11 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 
 | network | apostille | verifier |
 |---|---|---|
-| BNB Smart Chain testnet (97) | [`0x2d4a…9728`](https://testnet.bscscan.com/address/0x2d4a5728Ee2d43da19167aC33D0F047A877e9728) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
+| BNB Smart Chain testnet (97) | [`0x13dC…Ac45`](https://testnet.bscscan.com/address/0x13dC1B1dC6888746Fca76E0d15FFF7f49b4AAc45) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
 
 ## roadmap
 
-- more sources: OKX, Bybit and Bitget expose the same 30-day volume data (Primus templates already exist for their spot volume).
-- threshold-only mode: prove "futures volume ≥ tier bar" with Primus `>` conditions, so even the exact volume stays private.
+- register OKX, Bybit and Bitget as sources (templates for their spot volume exist; futures/VIP endpoints still need capturing).
 - Primus Network SDK path for fully decentralized attestation once it is available on BNB Chain.
 
 ## license

@@ -1,0 +1,44 @@
+.perp { padding-bottom: 2rem; }
+.perp-head { padding: clamp(3rem, 7vw, 5rem) 0 2.5rem; max-width: 46rem; }
+.perp-head h1 { max-width: none; font-size: clamp(3rem, 6.4vw, 5.2rem); }
+.perp-head code { font-size: 0.95em; }
+
+.ticket-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: start; padding-bottom: 4rem; }
+@media (max-width: 900px) { .ticket-grid { grid-template-columns: 1fr; } }
+
+.ticket { border: 1.5px solid var(--ink); border-radius: 6px; padding: 1.5rem; background: rgba(255, 255, 255, 0.35); }
+.side { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1.25rem; }
+.side label { position: relative; }
+.side input { position: absolute; opacity: 0; }
+.side span { display: block; text-align: center; padding: 0.7rem; border-radius: 4px; border: 1.5px solid rgba(23, 50, 74, 0.25); font-weight: 600; cursor: pointer; }
+.side input:checked + span { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.side input[value="short"]:checked + span { background: var(--stamp); border-color: var(--stamp); }
+.side input:focus-visible + span { outline: 2px solid var(--stamp); outline-offset: 2px; }
+
+.field-label { display: block; font-size: 0.9rem; color: var(--ink-soft); margin: 0 0 0.35rem; }
+.field { width: 100%; font: 600 1rem var(--text); padding: 0.75rem 0.85rem; border: 1.5px solid var(--ink); border-radius: 4px; background: var(--paper); color: var(--ink); }
+.size-row { position: relative; }
+.field.big { font: 700 2rem/1 var(--display); padding: 0.6rem 5rem 0.5rem 0.85rem; font-variant-numeric: tabular-nums; }
+.unit { position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--ink-soft); }
+.presets { display: flex; gap: 0.4rem; margin: 0.6rem 0 1.25rem; flex-wrap: wrap; }
+.presets button { font: 600 0.85rem var(--text); padding: 0.35rem 0.7rem; border-radius: 999px; border: 1px solid rgba(23, 50, 74, 0.3); background: transparent; color: var(--ink); cursor: pointer; }
+.presets button:hover { border-color: var(--ink); }
+.hint { font-size: 0.88rem; color: var(--ink-soft); margin: 0.6rem 0 0; }
+
+.quote { margin: 1.25rem 0; border-top: 1.5px solid var(--ink); }
+.quote div { display: flex; justify-content: space-between; align-items: baseline; padding: 0.6rem 0; border-bottom: 1px solid rgba(23, 50, 74, 0.15); }
+.quote dt { color: var(--ink-soft); font-size: 0.92rem; }
+.quote dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.quote .total dd { font: 900 2rem/1 var(--display); }
+.quote .total small { font: 600 0.85rem var(--text); color: var(--ink-soft); margin-left: 0.35rem; }
+.quote .save dd { color: var(--ok); font: 700 1.3rem/1 var(--display); }
+.ticket .btn-ink { width: 100%; }
+
+.compare h2 { font: 900 2.2rem/1 var(--display); margin: 0 0 1.25rem; }
+.compare table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.compare th { text-align: left; font-size: 0.82rem; color: var(--ink-soft); font-weight: 600; padding: 0.5rem 0.6rem; border-bottom: 1.5px solid var(--ink); }
+.compare td { padding: 0.8rem 0.6rem; border-bottom: 1px solid rgba(23, 50, 74, 0.15); }
+.compare td:first-child { font: 900 1.35rem/1 var(--display); }
+.compare tr[data-current] td { background: rgba(91, 42, 78, 0.08); }
+.compare tr[data-current] td:first-child { color: var(--stamp); }
+.perp-code .code { max-width: 46rem; }

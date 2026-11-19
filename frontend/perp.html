@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apostille: what a perp exchange charges you</title>
+    <meta name="description" content="A sample perp order ticket that reads your Apostille seal and prices your taker fee from it." />
+    <meta name="theme-color" content="#E4ECE6" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2317324A'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23E4ECE6' stroke-width='2'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="nav">
+      <a class="wordmark" href="/" aria-label="Apostille home">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" /><circle cx="16" cy="16" r="9" /></svg>
+        Apostille
+      </a>
+      <nav aria-label="Sections">
+        <a href="/">Get sealed</a>
+        <a href="https://github.com/moltaphet/apostille/blob/main/contracts/contracts/examples/DemoPerp.sol" target="_blank" rel="noopener">DemoPerp.sol</a>
+      </nav>
+      <button id="btn-connect" class="btn btn-outline" type="button">Connect wallet</button>
+    </header>
+
+    <main class="perp">
+      <section class="perp-head">
+        <h1>Your seal at a perp exchange</h1>
+        <p class="lede">
+          This order ticket works the way a perp DEX would after integrating Apostille: it reads your tier with one
+          <code>tierOf</code> call and discounts the taker fee. Quotes only, no funds move.
+        </p>
+      </section>
+
+      <section class="ticket-grid">
+        <form class="ticket" id="ticket" autocomplete="off">
+          <div class="side" role="radiogroup" aria-label="Side">
+            <label><input type="radio" name="side" value="long" checked /><span>Long</span></label>
+            <label><input type="radio" name="side" value="short" /><span>Short</span></label>
+          </div>
+
+          <label class="field-label" for="size">Size</label>
+          <div class="size-row">
+            <input id="size" class="field big" inputmode="decimal" value="1,000,000" aria-describedby="size-hint" />
+            <span class="unit">USDT</span>
+          </div>
+          <div class="presets" id="presets">
+            <button type="button" data-v="100000">100K</button>
+            <button type="button" data-v="1000000">1M</button>
+            <button type="button" data-v="10000000">10M</button>
+            <button type="button" data-v="50000000">50M</button>
+          </div>
+
+          <label class="field-label" for="as-tier">Price it as</label>
+          <select id="as-tier" class="field"></select>
+          <p class="hint" id="size-hint">Connect a wallet to use your own seal, or preview any tier.</p>
+
+          <dl class="quote" aria-live="polite">
+            <div><dt>Base taker fee</dt><dd id="q-base">0.05%</dd></div>
+            <div><dt>Your tier</dt><dd id="q-tier">Standard</dd></div>
+            <div><dt>Discount</dt><dd id="q-disc">0%</dd></div>
+            <div class="total"><dt>You pay</dt><dd><span id="q-fee">$500</span> <small id="q-rate">at 0.05%</small></dd></div>
+            <div class="save"><dt>You save</dt><dd id="q-save">$0</dd></div>
+          </dl>
+          <button class="btn btn-ink" type="button" disabled title="Demo ticket: quotes only">Place order (demo)</button>
+        </form>
+
+        <aside class="compare">
+          <h2>Same trade, every tier</h2>
+          <table>
+            <thead><tr><th>Tier</th><th>Rate</th><th>Fee</th><th>Saved</th></tr></thead>
+            <tbody id="compare-rows"></tbody>
+          </table>
+          <p class="hint">Monthly, at this size per day for 30 days: <b id="monthly">–</b> saved at your tier.</p>
+        </aside>
+      </section>
+
+      <section class="integrate perp-code" aria-labelledby="code-title">
+        <div class="section-head">
+          <h2 id="code-title">The integration is this</h2>
+          <p>
+            <code>ApostilleFees</code> fails open: if the registry can't be read, the base fee applies, so trading never
+            depends on Apostille being up. The protocol also caps the discount it grants.
+          </p>
+        </div>
+<pre class="code" tabindex="0"><code><span class="k">using</span> ApostilleFees <span class="k">for</span> IApostille;
+
+<span class="k">function</span> trade(<span class="t">int256</span> sizeDelta) <span class="k">external</span> {
+  <span class="t">uint256</span> notional = abs(sizeDelta);
+  (<span class="t">uint256</span> fee, , ) = apostille.feeOn(
+    msg.sender, notional, baseFeePips, maxDiscountBps
+  );
+  margin[msg.sender] -= fee;
+  <span class="k">// ...</span>
+}</code></pre>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>Fees in this demo: 0.05% base taker fee, discount capped at 50%.</p>
+      <p><a href="https://github.com/moltaphet/apostille" target="_blank" rel="noopener">Source</a></p>
+    </footer>
+
+    <script type="module" src="/src/perp/perp.js"></script>
+  </body>
+</html>
