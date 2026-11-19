@@ -5,7 +5,11 @@
 import { Wallet, keccak256, toUtf8Bytes } from "ethers";
 import { checkSignParams, createRateLimiter, DEFAULT_TEMPLATE_ID } from "../lib/signer.js";
 
-const { PRIMUS_APP_ID, PRIMUS_APP_SECRET, PRIMUS_TEMPLATE_ID = DEFAULT_TEMPLATE_ID } = process.env;
+const {
+  PRIMUS_APP_ID = "0x97d782bfe1870c4ee29099bfcc8ebdda400e93eb", // public; must match the frontend
+  PRIMUS_APP_SECRET,
+  PRIMUS_TEMPLATE_ID = DEFAULT_TEMPLATE_ID,
+} = process.env;
 
 // Per-instance limit; warm instances are reused, so this caps bursts from one client.
 const limited = createRateLimiter({ windowMs: 60_000, max: 10 });

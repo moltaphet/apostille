@@ -1,5 +1,6 @@
 export const CONFIG = {
-  appId: import.meta.env.VITE_PRIMUS_APP_ID,
+  // Public Primus app id (it ships in the bundle anyway); override with VITE_PRIMUS_APP_ID.
+  appId: import.meta.env.VITE_PRIMUS_APP_ID || "0x97d782bfe1870c4ee29099bfcc8ebdda400e93eb",
   templateId: import.meta.env.VITE_PRIMUS_TEMPLATE_ID || "9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e",
   signerUrl: (import.meta.env.VITE_SIGNER_URL || "/api").replace(/\/$/, ""),
   // Public testnet deployment; override with VITE_APOSTILLE_ADDRESS.
