@@ -99,16 +99,17 @@ what the contract enforces, on top of Primus's attestor-signature check (which, 
 - **replay protection**: each uid hash only accepts attestations newer than the last one it used.
 - **one account, one wallet**: a uid hash bound to a wallet with an active seal can't be used by another wallet. it frees up when the seal expires or the holder calls `release()`.
 
-the signing service is the off-chain half: it only signs requests for the apostille template, with the `userId` SHA256 condition, plain `proxytls` mode, a valid wallet address and a fresh timestamp, and it rate-limits per IP. the app secret never reaches the browser.
+the signer (`frontend/api/sign.js`) is the off-chain half: it only signs requests for the apostille template, with the `userId` SHA256 condition, plain `proxytls` mode, a valid wallet address and a fresh timestamp, and it rate-limits per IP. the app secret never reaches the browser.
 
 **trust assumptions.** you trust the Primus attestor(s) registered on the verifier contract, and that Binance's endpoint reports what it claims. the contract owner can change tiers, time windows and the verifier address (`Ownable2Step`); seals already issued keep their stored tier until renewed.
 
 ## repository
 
 ```
-contracts/   Apostille.sol, FlatJson parser, Primus interface, hardhat tests + deploy scripts
-backend/     express signing service (holds the Primus app secret)
-frontend/    vite dapp: connect, prove, seal, certificate view, live tier table
+contracts/            Apostille.sol, FlatJson parser, Primus interface, hardhat tests + deploy scripts
+frontend/             vite dapp: connect, prove, seal, certificate view, live tier table
+frontend/api/sign.js  vercel function that holds the Primus app secret and signs requests
+frontend/lib/         signer policy shared by the function and local dev
 ```
 
 ## run it
@@ -125,23 +126,18 @@ cp .env.example .env          # add DEPLOYER_PRIVATE_KEY
 npm run deploy:bsc-testnet    # writes deployments/97.json
 ```
 
-**2. signer**
-
-```bash
-cd backend
-npm install
-cp .env.example .env          # PRIMUS_APP_ID, PRIMUS_APP_SECRET
-npm start                     # :8787
-```
-
-**3. frontend**
+**2. app (frontend + signer)**
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env          # VITE_PRIMUS_APP_ID, VITE_APOSTILLE_ADDRESS
-npm run dev                   # :5173
+cp .env.example .env.local    # VITE_PRIMUS_APP_ID, VITE_APOSTILLE_ADDRESS, PRIMUS_APP_ID, PRIMUS_APP_SECRET
+npm run dev                   # :5173, serves /api/sign locally too
 ```
+
+**3. deploy to vercel**
+
+import the repo on [vercel.com/new](https://vercel.com/new), set **root directory** to `frontend`, and add the environment variables from `frontend/.env.example`. `PRIMUS_APP_SECRET` is only read by `api/sign.js` and is never bundled into the site.
 
 ## deployments
 

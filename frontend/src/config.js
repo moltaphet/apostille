@@ -1,7 +1,7 @@
 export const CONFIG = {
   appId: import.meta.env.VITE_PRIMUS_APP_ID,
   templateId: import.meta.env.VITE_PRIMUS_TEMPLATE_ID || "9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e",
-  signerUrl: (import.meta.env.VITE_SIGNER_URL || "http://localhost:8787").replace(/\/$/, ""),
+  signerUrl: (import.meta.env.VITE_SIGNER_URL || "/api").replace(/\/$/, ""),
   apostille: import.meta.env.VITE_APOSTILLE_ADDRESS,
 };
 
