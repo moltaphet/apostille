@@ -45,6 +45,8 @@ const targetWrap = $("target-wrap");
 const targetTier = $("target-tier");
 const modeInputs = [...document.querySelectorAll('input[name="mode"]')];
 const mode = () => modeInputs.find((i) => i.checked)?.value || "revealed";
+const qualifierInputs = [...document.querySelectorAll('input[name="qualifier"]')];
+const qualifier = () => qualifierInputs.find((i) => i.checked)?.value || "volume";
 
 // ── Primus SDK: initialise once at load (production mode, no secret) ───
 const primus = new PrimusZKTLS();
@@ -98,6 +100,10 @@ function explain(err) {
   }
   if (err?.revert?.name) return ERROR_TEXT[err.revert.name] || `The contract rejected the proof (${err.revert.name}).`;
   if (err?.code === "ACTION_REJECTED" || err?.code === 4001) return "You cancelled the request in your wallet.";
+  if (String(err?.code) === "00104")
+    return mode() === "concealed"
+      ? "Your Binance account doesn't clear this tier's bar, so Primus won't attest it. Pick a lower tier, switch between volume and VIP, or use exact figures."
+      : "Primus couldn't verify your Binance data. Check that you're logged in to Binance in this browser, then try again.";
   if (err?.code && /^\d+$/.test(String(err.code)))
     return `Primus returned error ${err.code}${err.message ? `: ${err.message}` : ""}. Check that you're logged in to Binance in this browser.`;
   return err?.shortMessage || err?.message || String(err);
@@ -294,11 +300,17 @@ btnProve.addEventListener("click", async () => {
     stage = "seal";
     setStep("seal", "active");
     await ensureChain();
+    const att = toStruct(attestation);
+    // Pre-flight on a public node, not through the wallet: surfaces a revert reason and the gas
+    // without depending on the wallet's RPC (some wallets stall on large eth_calls).
+    const reader = readContract();
+    await reader.seal.staticCall(att, { from: account });
+    const gas = await reader.seal.estimateGas(att, { from: account });
+
     const signer = await new BrowserProvider(window.ethereum).getSigner();
     const apostille = new Contract(CONFIG.apostille, APOSTILLE_ABI, signer);
-    const att = toStruct(attestation);
-    await apostille.seal.staticCall(att); // surface a revert reason before asking for gas
-    const tx = await apostille.seal(att);
+    showNotice("Confirm the transaction in your wallet.", "ok");
+    const tx = await withWalletTimeout(apostille.seal(att, { gasLimit: (gas * 12n) / 10n }));
     showNotice("Transaction sent. Waiting for confirmation…", "ok");
     await tx.wait();
     setStep("seal", "done");
@@ -328,17 +340,33 @@ btnRelease.addEventListener("click", async () => {
   }
 });
 
-/** Primus conditions: always hash the user id; in concealed mode reduce every figure to ">=". */
+/**
+ * Primus conditions: always hash the user id. In concealed mode every figure becomes ">=".
+ * Primus refuses to attest when any condition is false (error 00104), so only the chosen
+ * qualifier carries the tier's bar; the other figures use ">= 0", which always holds and
+ * hides the real value.
+ */
 function conditionsFor(m) {
   const id = { field: "userId", op: "SHA256" };
   if (m !== "concealed") return [[id]];
   const t = tiers[Number(targetTier.value)] || tiers[1];
+  const byVip = qualifier() === "vip";
   return [[
     id,
-    { field: "vipLevel", op: ">=", value: String(t.minVipLevel) },
+    { field: "vipLevel", op: ">=", value: byVip ? String(t.minVipLevel) : "0" },
     { field: "spot30dVol", op: ">=", value: "0" },
-    { field: "futures30dVol", op: ">=", value: String(t.minFuturesVolume) },
+    { field: "futures30dVol", op: ">=", value: byVip ? "0" : String(t.minFuturesVolume) },
   ]];
+}
+
+/** Rejects if the wallet never answers, so the page doesn't wait forever. */
+function withWalletTimeout(promise, ms = 3 * 60 * 1000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Your wallet didn't respond. Open it from the browser toolbar, clear any pending requests, then try again.")), ms)
+    ),
+  ]);
 }
 
 function renderTargets() {

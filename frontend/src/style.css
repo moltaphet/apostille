@@ -95,6 +95,9 @@ h1 {
 .mode-opt b { display: block; }
 .mode-opt small { color: var(--ink-soft); font-size: 0.88rem; }
 .target[hidden] { display: none; }
+.qualifier { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 0.2rem; color: var(--ink); }
+.qualifier label { display: inline-flex; gap: 0.4rem; align-items: center; cursor: pointer; }
+.qualifier input { accent-color: var(--ink); }
 .target { display: grid; gap: 0.35rem; font-size: 0.92rem; color: var(--ink-soft); }
 .target select { font: 600 1rem var(--text); padding: 0.7rem 0.8rem; border: 1.5px solid var(--ink); border-radius: 4px; background: var(--paper); color: var(--ink); }
 .flow-hint { margin: 0.75rem 0 0; font-size: 0.92rem; color: var(--ink-soft); }
