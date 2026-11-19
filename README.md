@@ -60,6 +60,21 @@ using the public Primus template [`9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e`](https:
 | `spot30dVol` | `$.data.spot30dVol` | plain |
 | `futures30dVol` | `$.data.futures30dVol` | plain |
 
+## two disclosure modes
+
+each proof picks what goes on-chain, through Primus attestation conditions:
+
+| mode | what the attestation says | what's stored |
+|---|---|---|
+| exact figures | `vipLevel = 2`, `futures30dVol = 12500000.34`, … | the real numbers |
+| only my tier | `vipLevel >= 2: true`, `futures30dVol >= 10000000: true`, `spot30dVol >= 0: true` | the proven floors, flagged `concealed` |
+
+in both modes the user id is reported only as `SHA256($.data.userId)`; the contract requires that key, so a proof that revealed the raw id can't be sealed.
+
+## sources
+
+the contract is a registry of exchange endpoints (`addSource`, append-only, owner-gated). a source names the endpoint and the json paths of the id, VIP level, spot and futures volume. nullifiers are `keccak256(sourceId, SHA256(userId))`, so the same id on two exchanges is two accounts. Binance is source `0`; adding OKX, Bybit or Bitget means capturing their fee endpoint as a Primus template and registering it, with no new contract code (see `contracts/config/sources.js`).
+
 ## tiers
 
 a wallet lands in the highest tier where its VIP level **or** its 30-day futures volume clears the bar. the table lives on-chain and the owner can change it; discounts are a suggestion to integrators. apostille never moves funds.
@@ -125,7 +140,7 @@ easiest: open `/deploy` on the running site, connect a wallet on BSC testnet and
 ```bash
 cd contracts
 npm install
-npm test                      # 34 tests
+npm test                      # 44 tests
 cp .env.example .env          # add DEPLOYER_PRIVATE_KEY
 npm run deploy:bsc-testnet    # writes deployments/97.json
 npm run export:frontend       # refresh the bytecode used by /deploy after contract changes
@@ -152,8 +167,7 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 
 ## roadmap
 
-- more sources: OKX, Bybit and Bitget expose the same 30-day volume data (Primus templates already exist for their spot volume).
-- threshold-only mode: prove "futures volume ≥ tier bar" with Primus `>` conditions, so even the exact volume stays private.
+- register OKX, Bybit and Bitget as sources (templates for their spot volume exist; futures/VIP endpoints still need capturing).
 - Primus Network SDK path for fully decentralized attestation once it is available on BNB Chain.
 
 ## license

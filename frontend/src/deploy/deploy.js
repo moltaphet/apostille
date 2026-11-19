@@ -110,7 +110,7 @@ btnDeploy.addEventListener("click", async () => {
     btnDeploy.textContent = "Confirm the Apostille deployment…";
     const factory = new ContractFactory(artifact.abi, artifact.bytecode, signer);
     const tiers = D.tiers.map((t) => ({ ...t, minFuturesVolume: BigInt(t.minFuturesVolume) }));
-    const contract = await factory.deploy(account, verifier, D.maxAttestationAge, D.sealValidity, tiers);
+    const contract = await factory.deploy(account, verifier, D.maxAttestationAge, D.sealValidity, tiers, D.sources);
     btnDeploy.textContent = "Deploying Apostille…";
     showNotice(`Transaction sent: ${contract.deploymentTransaction().hash}`, "ok");
     await contract.waitForDeployment();

@@ -2,6 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const TIERS = require("../config/tiers");
+const SOURCES = require("../config/sources").map(({ templateId, ...s }) => s);
 
 const SOURCE_URL =
   "https://www.binance.com/bapi/accounts/v1/private/vip/vip-portal/vip-fee/vip-fee-summary";
@@ -51,7 +52,7 @@ async function deploy() {
   const [owner, alice, mallory] = await ethers.getSigners();
   const attestor = ethers.Wallet.createRandom();
   const verifier = await ethers.deployContract("AttestorVerifier", [owner.address, [attestor.address]]);
-  const apostille = await ethers.deployContract("Apostille", [owner.address, await verifier.getAddress(), 900, 30 * 86400, TIERS]);
+  const apostille = await ethers.deployContract("Apostille", [owner.address, await verifier.getAddress(), 900, 30 * 86400, TIERS, SOURCES]);
   return { owner, alice, mallory, attestor, verifier, apostille };
 }
 
@@ -106,7 +107,7 @@ describe("AttestorVerifier", () => {
   it("lets an existing Apostille switch to this verifier", async () => {
     const { owner, alice, attestor, verifier } = await loadFixture(deploy);
     const mock = await ethers.deployContract("MockPrimusZKTLS");
-    const apostille = await ethers.deployContract("Apostille", [owner.address, await mock.getAddress(), 900, 30 * 86400, TIERS]);
+    const apostille = await ethers.deployContract("Apostille", [owner.address, await mock.getAddress(), 900, 30 * 86400, TIERS, SOURCES]);
     await apostille.setPrimus(await verifier.getAddress());
     const forged = await signed(ethers.Wallet.createRandom(), alice.address);
     await expect(apostille.connect(alice).seal(forged)).to.be.revertedWithCustomError(verifier, "UnknownAttestor");

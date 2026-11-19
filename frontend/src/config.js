@@ -21,15 +21,19 @@ export const CHAIN = {
 };
 
 export const APOSTILLE_ABI = [
-  "function seal((address recipient,(string url,string header,string method,string body) request,(string keyName,string parseType,string parsePath)[] reponseResolve,string data,string attConditions,uint64 timestamp,string additionParams,(address attestorAddr,string url)[] attestors,bytes[] signatures) att) returns ((bytes32 accountHash,uint8 vipLevel,uint8 tier,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
+  "function seal((address recipient,(string url,string header,string method,string body) request,(string keyName,string parseType,string parsePath)[] reponseResolve,string data,string attConditions,uint64 timestamp,string additionParams,(address attestorAddr,string url)[] attestors,bytes[] signatures) att) returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
   "function release()",
   "function tierOf(address wallet) view returns (bool active, uint8 tier, uint16 discountBps)",
-  "function sealOf(address wallet) view returns ((bytes32 accountHash,uint8 vipLevel,uint8 tier,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
+  "function sealOf(address wallet) view returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
   "function tiers() view returns ((string name,uint8 minVipLevel,uint128 minFuturesVolume,uint16 feeDiscountBps)[])",
-  "event Sealed(address indexed wallet, bytes32 indexed accountHash, uint8 tier, uint8 vipLevel, uint128 futures30dVolume, uint128 spot30dVolume, uint64 expiresAt)",
+  "function sources() view returns ((string name,string url,string idPath,string vipPath,string spotPath,string futuresPath,bool enabled)[])",
+  "event Sealed(address indexed wallet, bytes32 indexed account, uint8 indexed source, uint8 tier, bool concealed, uint8 vipLevel, uint128 futures30dVolume, uint128 spot30dVolume, uint64 expiresAt)",
   "error RecipientMismatch(address recipient, address caller)",
   "error UnexpectedSource(string url)",
-  "error UnexpectedField(string keyName)",
+  "error UnexpectedField(string parsePath)",
+  "error MissingField(string parsePath)",
+  "error UnsupportedCondition(string op, string parsePath)",
+  "error IdNotHashed(string parsePath)",
   "error StaleAttestation(uint64 timestampMs)",
   "error AttestationFromFuture(uint64 timestampMs)",
   "error ReplayedAttestation(uint64 timestampMs, uint64 lastTimestampMs)",
@@ -50,5 +54,8 @@ export const ERROR_TEXT = {
   ReplayedAttestation: "This proof (or a newer one) was already used for this Binance account.",
   AccountBoundElsewhere: "This Binance account already backs another wallet with an active seal.",
   NoActiveSeal: "This wallet has no seal to release.",
-  InvalidHex: "The Binance user id was not hashed. Start the proof again.",
+  InvalidHex: "The proof's account hash is malformed. Start the proof again.",
+  IdNotHashed: "The Binance user ID wasn't hashed in this proof. Start the proof again.",
+  MissingField: "The proof is missing a field Apostille needs. Start the proof again.",
+  UnsupportedCondition: "The proof uses a condition Apostille doesn't accept.",
 };

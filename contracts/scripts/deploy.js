@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const hre = require("hardhat");
 const TIERS = require("../config/tiers");
+const SOURCES = require("../config/sources").map(({ templateId, ...s }) => s);
 
 // Primus zkTLS verifier (TransparentUpgradeableProxy) per chain, from
 // github.com/primus-labs/zktls-contracts/tree/main/broadcast/PrimusZkTLS.s.sol
@@ -28,7 +29,7 @@ async function main() {
   console.log(`  owner           ${owner}`);
   console.log(`  primus verifier ${primus}`);
 
-  const args = [owner, primus, MAX_ATTESTATION_AGE, SEAL_VALIDITY, TIERS];
+  const args = [owner, primus, MAX_ATTESTATION_AGE, SEAL_VALIDITY, TIERS, SOURCES];
   const apostille = await hre.ethers.deployContract("Apostille", args);
   await apostille.waitForDeployment();
   const address = await apostille.getAddress();
@@ -44,7 +45,7 @@ async function main() {
         address,
         primus,
         owner,
-        args: args.map((a) => (Array.isArray(a) ? a.map((t) => ({ ...t, minFuturesVolume: t.minFuturesVolume.toString() })) : a)),
+        args: args.map((a) => (Array.isArray(a) ? a.map((t) => (t.minFuturesVolume !== undefined ? { ...t, minFuturesVolume: t.minFuturesVolume.toString() } : t)) : a)),
         tx: apostille.deploymentTransaction()?.hash,
         deployedAt: new Date().toISOString(),
       },
