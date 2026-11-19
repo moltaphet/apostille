@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apostille: your exchange standing, notarized on-chain</title>
+    <meta name="description" content="Prove your Binance VIP level and 30-day volume with zkTLS and carry your fee tier to any protocol." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <a class="brand" href="#">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <span>Apostille</span>
+      </a>
+      <nav class="bar-links">
+        <a href="#how">How it works</a>
+        <a href="#tiers">Tiers</a>
+        <a href="#integrate">Integrate</a>
+      </nav>
+      <button id="btn-connect" class="btn btn-ghost">Connect wallet</button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">zkTLS · Primus · BNB Smart Chain</p>
+        <h1>Your exchange standing,<br /><em>notarized</em> on-chain.</h1>
+        <p class="lede">
+          You've earned VIP fees on Binance. Apostille turns that into a seal any protocol can read in one call:
+          proven with zkTLS, bound to your wallet, and your Binance user id never shown.
+        </p>
+      </section>
+
+      <section class="desk">
+        <div class="panel" id="prove-panel">
+          <h2>Request your seal</h2>
+          <ol class="steps" id="steps">
+            <li data-step="wallet"><span class="dot"></span><div><b>Connect wallet</b><small>The seal is issued to this address.</small></div></li>
+            <li data-step="sign"><span class="dot"></span><div><b>Authorize request</b><small>Apostille's signer approves an exact, hashed-id request.</small></div></li>
+            <li data-step="prove"><span class="dot"></span><div><b>Prove on Binance</b><small>The Primus extension reads your VIP fee summary over zkTLS.</small></div></li>
+            <li data-step="seal"><span class="dot"></span><div><b>Seal on-chain</b><small>The contract verifies the attestation and records your tier.</small></div></li>
+          </ol>
+          <button id="btn-prove" class="btn btn-primary" disabled>Prove my Binance tier</button>
+          <p class="hint" id="hint">Needs the <a href="https://chromewebstore.google.com/detail/primus/oeiomhmbaapihbilkfkhmlajkeegnjhe" target="_blank" rel="noopener">Primus extension</a> and a Binance login in this browser.</p>
+          <div class="notice" id="notice" hidden></div>
+        </div>
+
+        <article class="certificate" id="certificate" data-state="empty">
+          <div class="cert-head">
+            <span>Certificate of Standing</span>
+            <span id="cert-chain">BSC Testnet</span>
+          </div>
+          <div class="wax" id="wax"><span id="wax-tier">-</span></div>
+          <h3 id="cert-tier">No seal yet</h3>
+          <p class="cert-sub" id="cert-sub">Connect a wallet to look up its seal.</p>
+          <dl class="cert-grid">
+            <div><dt>VIP level</dt><dd id="cert-vip">-</dd></div>
+            <div><dt>Fee discount</dt><dd id="cert-discount">-</dd></div>
+            <div><dt>Futures · 30d</dt><dd id="cert-futures">-</dd></div>
+            <div><dt>Spot · 30d</dt><dd id="cert-spot">-</dd></div>
+            <div><dt>Valid until</dt><dd id="cert-expiry">-</dd></div>
+            <div><dt>Account</dt><dd id="cert-account" class="mono">-</dd></div>
+          </dl>
+          <div class="cert-foot">
+            <span class="mono" id="cert-holder">-</span>
+            <button id="btn-release" class="btn btn-link" hidden>Release seal</button>
+          </div>
+        </article>
+      </section>
+
+      <section id="how" class="band">
+        <h2>How it works</h2>
+        <div class="cols">
+          <div><span class="num">01</span><h4>Read at the source</h4><p>Primus zkTLS attests the response of Binance's own <code>vip-fee-summary</code> endpoint: VIP level, 30-day spot and futures volume.</p></div>
+          <div><span class="num">02</span><h4>Reveal only what matters</h4><p>Your Binance user id is SHA256-hashed inside the proof. The hash is a nullifier: one exchange account backs one wallet at a time.</p></div>
+          <div><span class="num">03</span><h4>Verified on-chain</h4><p>The contract checks the attestor signature, endpoint, JSON paths, freshness and recipient before it records anything.</p></div>
+        </div>
+      </section>
+
+      <section id="tiers" class="band">
+        <h2>Tiers</h2>
+        <p class="band-lede">You land in the highest tier where your VIP level <em>or</em> your 30-day futures volume clears the bar.</p>
+        <table class="tiers">
+          <thead><tr><th>Tier</th><th>VIP level</th><th>or futures volume (30d)</th><th>Suggested discount</th></tr></thead>
+          <tbody id="tier-rows"></tbody>
+        </table>
+      </section>
+
+      <section id="integrate" class="band">
+        <h2>Integrate in one call</h2>
+        <p class="band-lede">Perp DEXs, launchpads and lending markets can read a wallet's tier without trusting a screenshot or a spreadsheet.</p>
+<pre class="code"><code>interface IApostille {
+    function tierOf(address wallet)
+        external view returns (bool active, uint8 tier, uint16 discountBps);
+}
+
+(bool active, , uint16 discountBps) = IApostille(APOSTILLE).tierOf(trader);
+uint256 fee = active ? baseFee * (10_000 - discountBps) / 10_000 : baseFee;</code></pre>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span>Apostille · built on <a href="https://primuslabs.xyz" target="_blank" rel="noopener">Primus</a> zkTLS</span>
+      <a id="contract-link" href="#" target="_blank" rel="noopener">Contract</a>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

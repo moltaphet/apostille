@@ -1,0 +1,22 @@
+{
+  "name": "@apostille/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "deploy:bsc-testnet": "hardhat run scripts/deploy.js --network bscTestnet",
+    "verify:bsc-testnet": "hardhat run scripts/verify.js --network bscTestnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.0",
+    "solc": "^0.8.24"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.*
+!.env.example
+
+# hardhat
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+contracts/coverage/
+contracts/coverage.json
+
+# vite
+frontend/dist/
+
+.DS_Store
+*.log
