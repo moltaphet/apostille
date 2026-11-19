@@ -45,10 +45,14 @@
                 <input type="radio" name="mode" value="concealed" />
                 <span><b>Only my tier</b><small>The proof only says you clear a tier's bar. Your real volume stays in your browser.</small></span>
               </label>
-              <label class="target" id="target-wrap" hidden>
-                Tier to prove
+              <div class="target" id="target-wrap" hidden>
+                <label for="target-tier">Tier to prove</label>
                 <select id="target-tier"></select>
-              </label>
+                <div class="qualifier" role="radiogroup" aria-label="Qualify by">
+                  <label><input type="radio" name="qualifier" value="volume" checked /> by futures volume</label>
+                  <label><input type="radio" name="qualifier" value="vip" /> by VIP level</label>
+                </div>
+              </div>
             </fieldset>
             <button id="btn-prove" class="btn btn-ink" type="button" disabled>Prove my Binance tier</button>
             <p class="flow-hint" id="hint">Connect a wallet on BNB Smart Chain testnet to start.</p>
