@@ -241,3 +241,18 @@ figcaption { max-width: 560px; margin: 1.75rem auto 0; }
   .rung-bar { grid-column: 1 / -1; grid-row: 2; }
   .rung-vip { display: none; }
 }
+
+/* ── seal on other chains ───────────────────────────────────────────── */
+.cert-chains { margin: 0 0 1rem; }
+.cert-chains[hidden] { display: none; }
+.cert-chains .chains-title { margin: 0 0 .4rem; font-size: .8rem; color: var(--ink-soft); }
+.cert-chains ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
+.cert-chains li { display: inline-flex; gap: .45rem; align-items: center; padding: .3rem .7rem; border: 1px solid var(--ink); border-radius: 999px; font-size: .82rem; }
+.cert-chains .chain-name { font-weight: 700; }
+.cert-chains li::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; opacity: .35; }
+.cert-chains li[data-state="ok"] { color: var(--ok); border-color: currentColor; }
+.cert-chains li[data-state="ok"]::before { opacity: 1; }
+.cert-chains li[data-state="wait"]::before { animation: chain-pulse 1.2s ease-in-out infinite; opacity: 1; background: var(--stamp); }
+.cert-chains li[data-state="err"] { color: var(--stamp); }
+@keyframes chain-pulse { 50% { opacity: .2; } }
+@media (prefers-reduced-motion: reduce) { .cert-chains li[data-state="wait"]::before { animation: none; } }

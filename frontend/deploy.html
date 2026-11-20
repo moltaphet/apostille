@@ -48,6 +48,41 @@
         </p>
       </section>
 
+      <section class="existing" id="multichain">
+        <h2>Go multi-chain</h2>
+        <p>
+          Mirror seals from the hub on BSC testnet to other chains through Hyperlane. The hub keeps verifying proofs and
+          owns the one-account-one-wallet rule; each spoke is a read-only copy that answers <code>tierOf</code> on its chain.
+          You need a little test ETH on each spoke chain for its deployment.
+        </p>
+        <div class="row">
+          <label for="hub-addr">Hub (Apostille on BSC testnet)</label>
+          <input id="hub-addr" class="field" placeholder="0x…" spellcheck="false" autocomplete="off" />
+        </div>
+        <ol class="mc-steps">
+          <li>
+            <span class="mc-label">Turn on messaging on the hub</span>
+            <span class="mc-state" id="mc-mailbox">–</span>
+            <button id="btn-mailbox" class="btn btn-outline" type="button" disabled>Set mailbox</button>
+          </li>
+          <li>
+            <span class="mc-label">Deploy the spoke on Base Sepolia</span>
+            <span class="mc-state" id="mc-84532">–</span>
+            <button data-spoke="84532" class="btn btn-outline btn-spoke" type="button" disabled>Deploy on Base Sepolia</button>
+          </li>
+          <li>
+            <span class="mc-label">Deploy the spoke on Arbitrum Sepolia</span>
+            <span class="mc-state" id="mc-421614">–</span>
+            <button data-spoke="421614" class="btn btn-outline btn-spoke" type="button" disabled>Deploy on Arbitrum Sepolia</button>
+          </li>
+          <li>
+            <span class="mc-label">Register the spokes on the hub</span>
+            <span class="mc-state" id="mc-register">–</span>
+            <button id="btn-register" class="btn btn-ink" type="button" disabled>Register spokes</button>
+          </li>
+        </ol>
+      </section>
+
       <section class="existing" id="existing">
         <h2>Already deployed?</h2>
         <p>

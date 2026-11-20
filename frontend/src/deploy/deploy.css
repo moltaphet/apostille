@@ -20,3 +20,12 @@
 .field { font: 600 1rem var(--text); padding: 0.8rem 0.9rem; border: 1.5px solid var(--ink); border-radius: 4px; background: #f1f5f2; color: var(--ink); min-width: 0; }
 .yes { color: var(--ok); }
 .no { color: var(--stamp); }
+
+.mc-steps { list-style: none; padding: 0; margin: 1.25rem 0 0; counter-reset: mc; }
+.mc-steps li { counter-increment: mc; display: grid; grid-template-columns: 2rem 1fr auto; grid-template-areas: "n label btn" "n state btn"; gap: .15rem 1rem; align-items: center; padding: .9rem 0; border-top: 1px solid var(--paper-deep); }
+.mc-steps li::before { content: counter(mc); grid-area: n; font-family: var(--display); font-weight: 700; font-size: 1.4rem; color: var(--line); }
+.mc-label { grid-area: label; font-weight: 600; }
+.mc-state { grid-area: state; font-size: .85rem; color: var(--ink-soft); word-break: break-all; }
+.mc-state a { color: inherit; }
+.mc-steps .btn { grid-area: btn; }
+.mc-steps li[data-done] .mc-state { color: var(--ok); }

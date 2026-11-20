@@ -9,6 +9,8 @@
     "coverage": "hardhat coverage",
     "deploy:bsc-testnet": "hardhat run scripts/deploy.js --network bscTestnet",
     "verify:bsc-testnet": "hardhat run scripts/verify.js --network bscTestnet",
+    "deploy:spoke:base-sepolia": "hardhat run scripts/deploy-spoke.js --network baseSepolia",
+    "deploy:spoke:arbitrum-sepolia": "hardhat run scripts/deploy-spoke.js --network arbitrumSepolia",
     "export:frontend": "hardhat compile && node scripts/export-artifact.js"
   },
   "devDependencies": {

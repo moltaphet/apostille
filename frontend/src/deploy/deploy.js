@@ -7,7 +7,7 @@ import "../style.css";
 import "./deploy.css";
 import { BrowserProvider, Contract, ContractFactory, JsonRpcProvider, formatEther, isAddress } from "ethers";
 import { ensureChain, WRONG_CHAIN_TEXT } from "../wallet.js";
-import { CHAIN } from "../config.js";
+import { CHAIN, CHAINS } from "../config.js";
 import artifact from "./apostille.artifact.json";
 
 const D = artifact.defaults;
@@ -42,6 +42,7 @@ $("p-tiers").textContent = D.tiers
 
 
 async function refresh() {
+  mcRefresh?.();
   btnConnect.textContent = account ? short(account) : "Connect wallet";
   $("p-owner").textContent = account || "Connect a wallet";
   btnDeploy.disabled = !account;
@@ -117,6 +118,8 @@ btnDeploy.addEventListener("click", async () => {
     const address = await contract.getAddress();
 
     $("addr").textContent = address;
+    hubInput.value = address;
+    mcRefresh();
     $("addr-link").href = `${CHAIN.explorer}/address/${address}`;
     $("result").hidden = false;
     showNotice("");
@@ -221,3 +224,126 @@ btnSwitch.addEventListener("click", async () => {
 });
 
 if (addrInput.value) check();
+
+// ── multi-chain: mailbox, spokes, registration ──────────────────────────
+const HUB_ABI = [
+  "function owner() view returns (address)",
+  "function mailbox() view returns (address)",
+  "function setMailbox(address)",
+  "function spokes() view returns ((uint32 domain,address spoke)[])",
+  "function addSpoke(uint32 domain,address spoke)",
+];
+const SPOKE_CHAINS = [84532, 421614];
+const hubInput = $("hub-addr");
+hubInput.value = new URLSearchParams(location.search).get("hub") || "";
+const savedSpokes = (() => {
+  try {
+    return JSON.parse(localStorage.getItem("apostille:spokes") || "{}");
+  } catch (_) {
+    return {};
+  }
+})();
+const saveSpokes = () => {
+  try {
+    localStorage.setItem("apostille:spokes", JSON.stringify(savedSpokes));
+  } catch (_) {}
+};
+const link = (chain, addr) => `<a href="${chain.explorer}/address/${addr}" target="_blank" rel="noopener">${addr}</a>`;
+const fail = (err) => showNotice(err?.code === "ACTION_REJECTED" ? "You cancelled the transaction." : err?.shortMessage || err?.message || String(err));
+
+async function mcRefresh() {
+  const hub = hubInput.value.trim();
+  const hubKey = hub.toLowerCase();
+  const ready = account && isAddress(hub);
+  $("btn-mailbox").disabled = !ready;
+  document.querySelectorAll(".btn-spoke").forEach((b) => (b.disabled = !ready));
+  $("btn-register").disabled = !ready;
+  if (!isAddress(hub)) return;
+  try {
+    const c = new Contract(hub, HUB_ABI, read);
+    const [mb, registered] = await Promise.all([c.mailbox(), c.spokes()]);
+    const mbOk = mb.toLowerCase() === CHAINS[97].mailbox.toLowerCase();
+    $("mc-mailbox").textContent = mbOk ? `On (${mb})` : mb === "0x0000000000000000000000000000000000000000" ? "Off" : `Unexpected mailbox ${mb}`;
+    $("mc-mailbox").parentElement.toggleAttribute("data-done", mbOk);
+    const reg = new Map(registered.map((r) => [Number(r.domain), r.spoke]));
+    for (const id of SPOKE_CHAINS) {
+      const chain = CHAINS[id];
+      const addr = reg.get(id) || savedSpokes[hubKey]?.[id];
+      $(`mc-${id}`).innerHTML = addr ? link(chain, addr) : "Not deployed";
+      $(`mc-${id}`).parentElement.toggleAttribute("data-done", !!addr);
+    }
+    const pending = SPOKE_CHAINS.filter((id) => savedSpokes[hubKey]?.[id] && !reg.has(id));
+    $("mc-register").textContent = reg.size
+      ? `Registered: ${[...reg.keys()].map((id) => CHAINS[id]?.name || id).join(", ")}${pending.length ? `. Waiting: ${pending.map((id) => CHAINS[id].name).join(", ")}` : ""}`
+      : pending.length ? `Ready to register: ${pending.map((id) => CHAINS[id].name).join(", ")}` : "Nothing to register yet";
+    $("mc-register").parentElement.toggleAttribute("data-done", reg.size > 0 && !pending.length);
+  } catch (err) {
+    $("mc-mailbox").textContent = "That address isn't a multi-chain Apostille hub on BSC testnet (deploy a new one above).";
+  }
+}
+hubInput.addEventListener("change", mcRefresh);
+
+$("btn-mailbox").addEventListener("click", async () => {
+  try {
+    await ensureChain();
+    const signer = await new BrowserProvider(window.ethereum).getSigner();
+    const tx = await new Contract(hubInput.value.trim(), HUB_ABI, signer).setMailbox(CHAINS[97].mailbox);
+    showNotice(`Setting the mailbox: ${tx.hash}`, "ok");
+    await tx.wait();
+    showNotice("");
+    mcRefresh();
+  } catch (err) {
+    fail(err);
+  }
+});
+
+document.querySelectorAll(".btn-spoke").forEach((btn) =>
+  btn.addEventListener("click", async () => {
+    const id = Number(btn.dataset.spoke);
+    const chain = CHAINS[id];
+    const hub = hubInput.value.trim();
+    btn.disabled = true;
+    try {
+      await ensureChain(window.ethereum, chain);
+      const signer = await new BrowserProvider(window.ethereum).getSigner();
+      const f = new ContractFactory(artifact.spoke.abi, artifact.spoke.bytecode, signer);
+      const c = await f.deploy(account, chain.mailbox, 97, hub);
+      showNotice(`Deploying on ${chain.name}: ${c.deploymentTransaction().hash}`, "ok");
+      await c.waitForDeployment();
+      const addr = await c.getAddress();
+      (savedSpokes[hub.toLowerCase()] ||= {})[id] = addr;
+      saveSpokes();
+      showNotice(`Spoke on ${chain.name}: ${addr}. Add it to Vercel as VITE_SPOKE_${id === 84532 ? "BASE_SEPOLIA" : "ARBITRUM_SEPOLIA"}.`, "ok");
+    } catch (err) {
+      fail(err);
+    } finally {
+      btn.disabled = false;
+      try {
+        await ensureChain();
+      } catch (_) {}
+      mcRefresh();
+    }
+  })
+);
+
+$("btn-register").addEventListener("click", async () => {
+  const hub = hubInput.value.trim();
+  try {
+    await ensureChain();
+    const signer = await new BrowserProvider(window.ethereum).getSigner();
+    const c = new Contract(hub, HUB_ABI, signer);
+    const reg = new Set((await new Contract(hub, HUB_ABI, read).spokes()).map((r) => Number(r.domain)));
+    const todo = SPOKE_CHAINS.filter((id) => savedSpokes[hub.toLowerCase()]?.[id] && !reg.has(id));
+    if (!todo.length) return showNotice("Nothing new to register. Deploy a spoke first.");
+    for (const id of todo) {
+      const tx = await c.addSpoke(id, savedSpokes[hub.toLowerCase()][id]);
+      showNotice(`Registering ${CHAINS[id].name}: ${tx.hash}`, "ok");
+      await tx.wait();
+    }
+    showNotice("Spokes registered. New seals now reach every chain.", "ok");
+    mcRefresh();
+  } catch (err) {
+    fail(err);
+  }
+});
+if (hubInput.value) mcRefresh();

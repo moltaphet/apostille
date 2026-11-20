@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IPrimusZKTLS, Attestation, AttNetworkResponseResolve} from "./interfaces/IPrimusZKTLS.sol";
 import {FlatJson} from "./libraries/FlatJson.sol";
+import {IMailbox} from "./interfaces/IMailbox.sol";
 
 /// @title Apostille
 /// @author moltaphet
@@ -22,6 +23,11 @@ import {FlatJson} from "./libraries/FlatJson.sol";
 ///         The exchange user id never reaches the chain: Primus SHA256-hashes it inside the
 ///         attestation. Hashed per source, it is a nullifier: one exchange account backs one
 ///         wallet at a time.
+///
+///         Multi-chain: this contract is the hub. It alone verifies proofs and holds nullifiers.
+///         Every seal and release is also sent through Hyperlane to registered spokes
+///         (ApostilleSpoke) on other chains, which mirror the seals for integrators there. Because
+///         the nullifier lives only here, one exchange account backs one wallet across all chains.
 contract Apostille is Ownable2Step {
     using FlatJson for string;
 
@@ -67,6 +73,11 @@ contract Apostille is Ownable2Step {
     uint256 public constant MAX_TIERS = 16;
     uint256 public constant MAX_SOURCES = 32;
     uint256 private constant MAX_CLOCK_DRIFT = 5 minutes;
+    uint256 public constant MAX_SPOKES = 8;
+
+    /// @notice Message kinds sent to spokes.
+    uint8 public constant MSG_SEAL = 1;
+    uint8 public constant MSG_REVOKE = 2;
 
     bytes32 private constant OP_REVEAL = keccak256("REVEAL_STRING");
     bytes32 private constant OP_SHA256 = keccak256("SHA256");
@@ -88,6 +99,17 @@ contract Apostille is Ownable2Step {
     mapping(address wallet => Seal) private _seals;
     mapping(bytes32 account => address wallet) public walletOf;
     mapping(bytes32 account => uint64 timestampMs) public lastAttestationAt;
+
+    /// @notice A mirror of the registry on another chain.
+    struct Spoke {
+        uint32 domain; // Hyperlane domain id (equal to the chain id on the chains used here)
+        address spoke;
+    }
+
+    IMailbox public mailbox;
+    Spoke[] private _spokes;
+    /// @notice Increases with every message, so spokes can drop anything delivered out of order.
+    uint64 public syncNonce;
 
     // ---------------------------------------------------------------------
     // Events & errors
@@ -113,6 +135,10 @@ contract Apostille is Ownable2Step {
     event GuardianUpdated(address guardian);
     event Paused(address by);
     event Unpaused(address by);
+    event MailboxUpdated(address mailbox);
+    event SpokeAdded(uint32 indexed domain, address spoke);
+    event SpokeRemoved(uint32 indexed domain, address spoke);
+    event Broadcast(address indexed wallet, uint8 kind, uint64 nonce, uint256 fee);
 
     error RecipientMismatch(address recipient, address caller);
     error UnexpectedSource(string url);
@@ -132,6 +158,9 @@ contract Apostille is Ownable2Step {
     error NotGuardian(address caller);
     error SealingPaused();
     error MalformedPayload();
+    error InsufficientFee(uint256 required, uint256 provided);
+    error InvalidSpoke();
+    error RefundFailed();
 
     // ---------------------------------------------------------------------
     // Construction & admin
@@ -200,13 +229,40 @@ contract Apostille is Ownable2Step {
         emit SourceEnabled(id, enabled);
     }
 
+    /// @notice Hyperlane mailbox on this chain. Zero turns broadcasting off.
+    function setMailbox(IMailbox mailbox_) external onlyOwner {
+        mailbox = mailbox_;
+        emit MailboxUpdated(address(mailbox_));
+    }
+
+    function addSpoke(uint32 domain, address spoke) external onlyOwner {
+        if (spoke == address(0) || _spokes.length >= MAX_SPOKES) revert InvalidSpoke();
+        for (uint256 i; i < _spokes.length; ++i) if (_spokes[i].domain == domain) revert InvalidSpoke();
+        _spokes.push(Spoke(domain, spoke));
+        emit SpokeAdded(domain, spoke);
+    }
+
+    function removeSpoke(uint32 domain) external onlyOwner {
+        uint256 n = _spokes.length;
+        for (uint256 i; i < n; ++i) {
+            if (_spokes[i].domain == domain) {
+                emit SpokeRemoved(domain, _spokes[i].spoke);
+                _spokes[i] = _spokes[n - 1];
+                _spokes.pop();
+                return;
+            }
+        }
+        revert InvalidSpoke();
+    }
+
     // ---------------------------------------------------------------------
     // Core
     // ---------------------------------------------------------------------
 
     /// @notice Verifies a Primus attestation of the caller's exchange standing and issues
-    ///         (or renews) the caller's seal.
-    function seal(Attestation calldata att) external returns (Seal memory s) {
+    ///         (or renews) the caller's seal. When spokes are registered, send
+    ///         `quoteBroadcast()` as value to mirror the seal to them; any excess is refunded.
+    function seal(Attestation calldata att) external payable returns (Seal memory s) {
         if (paused) revert SealingPaused();
 
         // 1. Signature from a trusted attestor (reverts on failure).
@@ -255,15 +311,40 @@ contract Apostille is Ownable2Step {
         _seals[msg.sender] = s;
 
         emit Sealed(msg.sender, account, sourceId, s.tier, s.concealed, s.vipLevel, s.futures30dVolume, s.spot30dVolume, s.expiresAt);
+        _broadcast(MSG_SEAL, msg.sender, s);
     }
 
     /// @notice Drops the caller's seal and frees their exchange account for another wallet.
-    function release() external {
-        bytes32 account = _seals[msg.sender].account;
-        if (account == bytes32(0)) revert NoActiveSeal(msg.sender);
-        delete walletOf[account];
+    ///         Send `quoteBroadcast()` as value so the spokes drop it too.
+    function release() external payable {
+        Seal memory s = _seals[msg.sender];
+        if (s.account == bytes32(0)) revert NoActiveSeal(msg.sender);
+        delete walletOf[s.account];
         delete _seals[msg.sender];
-        emit Released(msg.sender, account);
+        emit Released(msg.sender, s.account);
+        _broadcast(MSG_REVOKE, msg.sender, s);
+    }
+
+    /// @notice Re-sends a wallet's current seal to every spoke, e.g. after a spoke is added or a
+    ///         message failed. Anyone may pay for it; it only repeats what the hub already holds.
+    function sync(address wallet) external payable {
+        Seal memory s = _seals[wallet];
+        if (s.account == bytes32(0)) revert NoActiveSeal(wallet);
+        _broadcast(MSG_SEAL, wallet, s);
+    }
+
+    /// @notice Total messaging fee for one seal, release or sync. Zero when no spokes are set.
+    function quoteBroadcast() external view returns (uint256 fee) {
+        if (address(mailbox) == address(0)) return 0;
+        Seal memory empty;
+        bytes memory body = abi.encode(MSG_SEAL, uint64(0), address(0), empty, uint16(0));
+        for (uint256 i; i < _spokes.length; ++i) {
+            fee += mailbox.quoteDispatch(_spokes[i].domain, _toBytes32(_spokes[i].spoke), body);
+        }
+    }
+
+    function spokes() external view returns (Spoke[] memory) {
+        return _spokes;
     }
 
     // ---------------------------------------------------------------------
@@ -477,6 +558,43 @@ contract Apostille is Ownable2Step {
         maxAttestationAge = maxAge;
         sealValidity = validity;
         emit WindowsUpdated(maxAge, validity);
+    }
+
+    // ---------------------------------------------------------------------
+    // Internals: messaging
+    // ---------------------------------------------------------------------
+
+    /// @dev Sends one message per spoke and refunds what is left of msg.value. Message bodies have
+    ///      a fixed size (static abi types only), so quoteBroadcast() is exact.
+    function _broadcast(uint8 kind, address wallet, Seal memory s) private {
+        uint256 n = _spokes.length;
+        uint256 spent;
+        if (n != 0 && address(mailbox) != address(0)) {
+            uint64 nonce = ++syncNonce;
+            uint16 discount = kind == MSG_SEAL ? _discountOf(s.tier) : 0;
+            bytes memory body = abi.encode(kind, nonce, wallet, s, discount);
+            for (uint256 i; i < n; ++i) {
+                bytes32 to = _toBytes32(_spokes[i].spoke);
+                uint256 fee = mailbox.quoteDispatch(_spokes[i].domain, to, body);
+                if (spent + fee > msg.value) revert InsufficientFee(spent + fee, msg.value);
+                spent += fee;
+                mailbox.dispatch{value: fee}(_spokes[i].domain, to, body);
+            }
+            emit Broadcast(wallet, kind, nonce, spent);
+        }
+        if (msg.value > spent) {
+            (bool ok,) = msg.sender.call{value: msg.value - spent}("");
+            if (!ok) revert RefundFailed();
+        }
+    }
+
+    function _discountOf(uint8 tier) private view returns (uint16) {
+        uint256 t = tier < _tiers.length ? tier : _tiers.length - 1;
+        return _tiers[t].feeDiscountBps;
+    }
+
+    function _toBytes32(address a) private pure returns (bytes32) {
+        return bytes32(uint256(uint160(a)));
     }
 
     function _toU128(uint256 v) private pure returns (uint128) {
