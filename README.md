@@ -199,6 +199,8 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 |---|---|---|
 | BNB Smart Chain testnet (97) | [`0x7EDa…D0B2`](https://testnet.bscscan.com/address/0x7EDa50410744a3e2B10a82016d8767f911cFD0B2) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
 
+first real seal: a live Binance account proven through the Primus extension and sealed in [`0x661c…d4d8`](https://testnet.bscscan.com/tx/0x661c3c8f9f84f817e2419b69e871f99f1bbd8122d17c582e05d3ac7f1beed4d8) (block 143845402, 20 nov 2026). the account is VIP 0 with no volume, so it holds the Standard seal.
+
 ## roadmap
 
 - register OKX, Bybit and Bitget as sources (templates for their spot volume exist; futures/VIP endpoints still need capturing).
