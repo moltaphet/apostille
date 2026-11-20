@@ -5,6 +5,11 @@ export const CONFIG = {
   signerUrl: (import.meta.env.VITE_SIGNER_URL || "/api").replace(/\/$/, ""),
   // Public testnet deployment; override with VITE_APOSTILLE_ADDRESS.
   apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x7EDa50410744a3e2B10a82016d8767f911cFD0B2",
+  // Mirrors of the hub on other chains (ApostilleSpoke), keyed by chain id. Empty = not deployed.
+  spokes: {
+    84532: import.meta.env.VITE_SPOKE_BASE_SEPOLIA || "",
+    421614: import.meta.env.VITE_SPOKE_ARBITRUM_SEPOLIA || "",
+  },
 };
 
 export const CHAIN = {
@@ -20,9 +25,56 @@ export const CHAIN = {
   explorer: "https://testnet.bscscan.com",
 };
 
+/** Chains a seal can be read on. The hub (97) verifies proofs; the others mirror it via Hyperlane.
+ *  Hyperlane domain ids equal chain ids on all of these. Mailboxes: hyperlane-registry. */
+export const CHAINS = {
+  97: { ...CHAIN, name: "BNB Smart Chain testnet", short: "BSC", mailbox: "0xF9F6F5646F478d5ab4e20B0F910C92F1CCC9Cc6D" },
+  84532: {
+    chainId: 84532,
+    hex: "0x14a34",
+    name: "Base Sepolia",
+    short: "Base",
+    mailbox: "0x6966b0E55883d49BFB24539356a2f8A673E02039",
+    explorer: "https://sepolia.basescan.org",
+    params: {
+      chainId: "0x14a34",
+      chainName: "Base Sepolia",
+      nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: ["https://sepolia.base.org"],
+      blockExplorerUrls: ["https://sepolia.basescan.org"],
+    },
+  },
+  421614: {
+    chainId: 421614,
+    hex: "0x66eee",
+    name: "Arbitrum Sepolia",
+    short: "Arbitrum",
+    mailbox: "0x598facE78a4302f11E3de0bee1894Da0b2Cb71F8",
+    explorer: "https://sepolia.arbiscan.io",
+    params: {
+      chainId: "0x66eee",
+      chainName: "Arbitrum Sepolia",
+      nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: ["https://sepolia-rollup.arbitrum.io/rpc"],
+      blockExplorerUrls: ["https://sepolia.arbiscan.io"],
+    },
+  },
+};
+
+/** The views a spoke shares with the hub. */
+export const SPOKE_ABI = [
+  "function tierOf(address wallet) view returns (bool active, uint8 tier, uint16 discountBps)",
+  "function sealOf(address wallet) view returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
+  "function isActive(address wallet) view returns (bool)",
+];
+
 export const APOSTILLE_ABI = [
-  "function seal((address recipient,(string url,string header,string method,string body) request,(string keyName,string parseType,string parsePath)[] reponseResolve,string data,string attConditions,uint64 timestamp,string additionParams,(address attestorAddr,string url)[] attestors,bytes[] signatures) att) returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
-  "function release()",
+  "function seal((address recipient,(string url,string header,string method,string body) request,(string keyName,string parseType,string parsePath)[] reponseResolve,string data,string attConditions,uint64 timestamp,string additionParams,(address attestorAddr,string url)[] attestors,bytes[] signatures) att) payable returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
+  "function release() payable",
+  "function sync(address wallet) payable",
+  "function quoteBroadcast() view returns (uint256)",
+  "function spokes() view returns ((uint32 domain,address spoke)[])",
+  "error InsufficientFee(uint256 required, uint256 provided)",
   "function tierOf(address wallet) view returns (bool active, uint8 tier, uint16 discountBps)",
   "function sealOf(address wallet) view returns ((bytes32 account,uint8 source,uint8 vipLevel,uint8 tier,bool concealed,uint64 issuedAt,uint64 expiresAt,uint128 spot30dVolume,uint128 futures30dVolume))",
   "function tiers() view returns ((string name,uint8 minVipLevel,uint128 minFuturesVolume,uint16 feeDiscountBps)[])",
@@ -62,4 +114,5 @@ export const ERROR_TEXT = {
   UnsupportedCondition: "The proof uses a condition Apostille doesn't accept.",
   SealingPaused: "New seals are paused right now. Existing seals still work. Try again later.",
   MalformedPayload: "The proof's data isn't in the shape Apostille expects. Start the proof again.",
+  InsufficientFee: "The cross-chain messaging fee changed. Try again.",
 };

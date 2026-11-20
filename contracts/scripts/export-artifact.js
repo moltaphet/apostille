@@ -7,6 +7,7 @@ const SOURCES = require("../config/sources").map(({ templateId, ...s }) => s);
 
 const art = require("../artifacts/contracts/Apostille.sol/Apostille.json");
 const verifier = require("../artifacts/contracts/AttestorVerifier.sol/AttestorVerifier.json");
+const spoke = require("../artifacts/contracts/ApostilleSpoke.sol/ApostilleSpoke.json");
 const out = path.join(__dirname, "..", "..", "frontend", "src", "deploy", "apostille.artifact.json");
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(
@@ -18,6 +19,7 @@ fs.writeFileSync(
       abi: art.abi,
       bytecode: art.bytecode,
       verifier: { abi: verifier.abi, bytecode: verifier.bytecode },
+      spoke: { abi: spoke.abi, bytecode: spoke.bytecode },
       defaults: {
         maxAttestationAge: 15 * 60,
         sealValidity: 30 * 24 * 60 * 60,

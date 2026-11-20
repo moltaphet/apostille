@@ -6,7 +6,7 @@ import "@fontsource/big-shoulders-display/900";
 import "./style.css";
 import { PrimusZKTLS } from "@primuslabs/zktls-js-sdk";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
-import { CONFIG, CHAIN, APOSTILLE_ABI, ERROR_TEXT } from "./config.js";
+import { CONFIG, CHAIN, CHAINS, SPOKE_ABI, APOSTILLE_ABI, ERROR_TEXT } from "./config.js";
 import { drawRosette } from "./guilloche.js";
 import { ensureChain, WRONG_CHAIN_TEXT } from "./wallet.js";
 
@@ -63,6 +63,24 @@ const primusInit = (async () => {
 // ── Formatting ───────────────────────────────────────────────────────────
 const readProvider = new JsonRpcProvider(CHAIN.params.rpcUrls[0], CHAIN.chainId, { staticNetwork: true });
 const readContract = () => new Contract(CONFIG.apostille, APOSTILLE_ABI, readProvider);
+const spokeList = () =>
+  Object.entries(CONFIG.spokes || {})
+    .filter(([, addr]) => addr)
+    .map(([id, addr]) => ({ chain: CHAINS[id], address: addr }));
+const spokeReaders = new Map();
+function spokeContract({ chain, address }) {
+  if (!spokeReaders.has(address))
+    spokeReaders.set(address, new Contract(address, SPOKE_ABI, new JsonRpcProvider(chain.params.rpcUrls[0], chain.chainId, { staticNetwork: true })));
+  return spokeReaders.get(address);
+}
+/** Messaging fee for one seal/release. Older hub deployments have no quoteBroadcast: zero. */
+async function broadcastFee() {
+  try {
+    return await readContract().quoteBroadcast();
+  } catch (_) {
+    return 0n;
+  }
+}
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "–");
 const usd = (v) => {
   const n = Number(v);
@@ -146,12 +164,40 @@ function renderCertificate(seal, status, { animate = false } = {}) {
   $("cert-expiry").textContent = has ? date(seal.expiresAt) : "–";
   $("cert-account").textContent = has ? short(seal.account) : "–";
   btnRelease.hidden = !has;
+  renderChains(has ? seal : null);
 
   if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     cert.dataset.drawing = "";
     setTimeout(() => delete cert.dataset.drawing, 3200);
   }
   renderLadder(has ? seal : null, active ? tier : -1);
+}
+
+// ── Other chains ─────────────────────────────────────────────────────────
+let chainPoll = 0;
+/** Shows, per spoke chain, whether the hub's seal has arrived there yet. Polls while any is pending. */
+async function renderChains(seal) {
+  const box = $("cert-chains");
+  const spokes = spokeList();
+  box.hidden = !spokes.length || !account;
+  clearTimeout(chainPoll);
+  if (box.hidden) return;
+  const row = (name, state, text) => `<li data-state="${state}"><span class="chain-name">${name}</span><span class="chain-state">${text}</span></li>`;
+  const hub = row(CHAINS[97].short, seal ? "ok" : "none", seal ? "Sealed here" : "No seal");
+  const results = await Promise.all(
+    spokes.map(async (sp) => {
+      try {
+        const mirror = await spokeContract(sp).sealOf(account);
+        const same = seal && mirror.account === seal.account && mirror.issuedAt === seal.issuedAt;
+        if (!seal) return { sp, state: mirror.account === ZERO_HASH ? "none" : "wait", text: mirror.account === ZERO_HASH ? "No seal" : "Removing…" };
+        return { sp, state: same ? "ok" : "wait", text: same ? "Mirrored" : "On its way…" };
+      } catch (_) {
+        return { sp, state: "err", text: "Unreachable" };
+      }
+    })
+  );
+  box.innerHTML = `<p class="chains-title">Readable on</p><ul>${hub}${results.map((r) => row(r.sp.chain.short, r.state, r.text)).join("")}</ul>`;
+  if (results.some((r) => r.state === "wait")) chainPoll = setTimeout(() => renderChains(seal), 8000);
 }
 
 // ── Tier ladder ──────────────────────────────────────────────────────────
@@ -304,17 +350,24 @@ btnProve.addEventListener("click", async () => {
     // Pre-flight on a public node, not through the wallet: surfaces a revert reason and the gas
     // without depending on the wallet's RPC (some wallets stall on large eth_calls).
     const reader = readContract();
-    await reader.seal.staticCall(att, { from: account });
-    const gas = await reader.seal.estimateGas(att, { from: account });
+    // When spokes are registered, the seal also pays Hyperlane to carry it to them.
+    const value = await broadcastFee();
+    await reader.seal.staticCall(att, { from: account, value });
+    const gas = await reader.seal.estimateGas(att, { from: account, value });
 
     const signer = await new BrowserProvider(window.ethereum).getSigner();
     const apostille = new Contract(CONFIG.apostille, APOSTILLE_ABI, signer);
     showNotice("Confirm the transaction in your wallet.", "ok");
-    const tx = await withWalletTimeout(apostille.seal(att, { gasLimit: (gas * 12n) / 10n }));
+    const tx = await withWalletTimeout(apostille.seal(att, { value, gasLimit: (gas * 12n) / 10n }));
     showNotice("Transaction sent. Waiting for confirmation…", "ok");
     await tx.wait();
     setStep("seal", "done");
-    showNotice("Sealed. Protocols can now read your tier.", "ok");
+    showNotice(
+      spokeList().length
+        ? "Sealed. Protocols can read your tier now, and on the other chains within a few minutes."
+        : "Sealed. Protocols can now read your tier.",
+      "ok"
+    );
     await loadSeal({ animate: true });
   } catch (err) {
     console.error(err);
@@ -331,7 +384,8 @@ btnRelease.addEventListener("click", async () => {
   try {
     await ensureChain();
     const signer = await new BrowserProvider(window.ethereum).getSigner();
-    const tx = await new Contract(CONFIG.apostille, APOSTILLE_ABI, signer).release();
+    const value = await broadcastFee();
+    const tx = await new Contract(CONFIG.apostille, APOSTILLE_ABI, signer).release({ value });
     await tx.wait();
     showNotice("Seal released. Your Binance account can now back another wallet.", "ok");
     await loadSeal();

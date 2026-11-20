@@ -129,6 +129,21 @@ const { fee } = feeOn(notional, 500n, tier, 5000);
 
 also available: `sealOf(address)` for the full record (VIP level, volumes, expiry, uid hash), `tiers()`, `previewTier(vip, volume)`, and the `Sealed` / `Released` events for indexers.
 
+## multi-chain
+
+the contract on BSC testnet is the **hub**: it alone checks Primus proofs and holds the nullifiers. every seal and release is also sent through [Hyperlane](https://hyperlane.xyz) to **spokes** (`ApostilleSpoke`) on Base Sepolia and Arbitrum Sepolia, which mirror the seals and answer the same `tierOf` / `sealOf` / `isActive` calls. an integration written for the hub works unchanged on a spoke, `ApostilleFees` included.
+
+```
+            seal / release ──▶ Apostille (hub, BSC) ──Hyperlane──▶ ApostilleSpoke (Base Sepolia)
+                                 proofs + nullifiers   └─────────▶ ApostilleSpoke (Arbitrum Sepolia)
+```
+
+- **one account = one wallet, everywhere.** the nullifier lives only on the hub, so an exchange account can't back one wallet on BSC and another on Base. when an account moves to a new wallet, the spokes drop the old copy.
+- **order doesn't matter.** every message carries the hub's increasing nonce; a spoke ignores anything older than what it has already seen for that wallet or account, so it always converges on the hub's latest state.
+- **who pays.** `seal()` and `release()` take `quoteBroadcast()` as value (the Hyperlane fee for every spoke) and refund any excess. with no spokes registered the fee is zero.
+- **repair.** anyone can call `sync(wallet)` to re-send a wallet's current seal, e.g. after a new spoke is added.
+- **set it up** from `/deploy` with your own wallet: turn on the hub's mailbox, deploy a spoke per chain, register them. or `HUB=0x… npm run deploy:spoke:base-sepolia`.
+
 ## governance
 
 - **owner = a timelock.** `contracts/scripts/govern.js` puts Apostille and its verifier behind an OpenZeppelin `TimelockController` (48h by default). every change to the verifier, tiers, windows or sources is queued on-chain for the delay, so users and integrators can see it coming, and the proposer can cancel it
@@ -203,6 +218,7 @@ first real seal: a live Binance account proven through the Primus extension and 
 
 ## roadmap
 
+- more spokes (opBNB, Ethereum Sepolia) and mainnet, behind the timelock.
 - register OKX, Bybit and Bitget as sources (templates for their spot volume exist; futures/VIP endpoints still need capturing).
 - Primus Network SDK path for fully decentralized attestation once it is available on BNB Chain.
 

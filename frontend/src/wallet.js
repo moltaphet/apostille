@@ -8,19 +8,19 @@ function isUnknownChain(err) {
   return code === 4902 || /unrecognized chain|unknown chain|not been added|add.*chain/i.test(msg);
 }
 
-/** Switches the wallet to BNB Smart Chain testnet, adding it first if needed. */
-export async function ensureChain(provider = window.ethereum) {
+/** Switches the wallet to `chain` (BNB Smart Chain testnet by default), adding it first if needed. */
+export async function ensureChain(provider = window.ethereum, chain = CHAIN) {
   const current = await provider.request({ method: "eth_chainId" });
-  if (current?.toLowerCase() === CHAIN.hex) return;
+  if (current?.toLowerCase() === chain.hex) return;
   try {
-    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN.hex }] });
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chain.hex }] });
   } catch (err) {
     if (!isUnknownChain(err)) throw err;
-    await provider.request({ method: "wallet_addEthereumChain", params: [CHAIN.params] });
+    await provider.request({ method: "wallet_addEthereumChain", params: [chain.params] });
     // Some wallets add without switching.
     const after = await provider.request({ method: "eth_chainId" });
-    if (after?.toLowerCase() !== CHAIN.hex)
-      await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN.hex }] });
+    if (after?.toLowerCase() !== chain.hex)
+      await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chain.hex }] });
   }
 }
 
