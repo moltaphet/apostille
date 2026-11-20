@@ -38,6 +38,9 @@ const flow = $("flow");
 const hint = $("hint");
 const notice = $("notice");
 const steps = $("steps");
+const sealbox = $("sealbox");
+const btnSeal = $("btn-seal");
+let pending = null; // last verified proof, waiting for the optional seal
 const cert = $("certificate");
 const rosette = $("rosette");
 const rungs = $("rungs");
@@ -61,8 +64,41 @@ const primusInit = (async () => {
 });
 
 // ── Formatting ───────────────────────────────────────────────────────────
-const readProvider = new JsonRpcProvider(CHAIN.params.rpcUrls[0], CHAIN.chainId, { staticNetwork: true });
-const readContract = () => new Contract(CONFIG.apostille, APOSTILLE_ABI, readProvider);
+// Several public BSC testnet nodes: one rate-limiting or timing out must not break the app.
+const READ_RPCS = [
+  "https://bsc-testnet-rpc.publicnode.com",
+  CHAIN.params.rpcUrls[0],
+  "https://data-seed-prebsc-2-s1.bnbchain.org:8545",
+];
+const readProviders = READ_RPCS.map((u) => new JsonRpcProvider(u, CHAIN.chainId, { staticNetwork: true, batchMaxCount: 1 }));
+let readIndex = 0;
+const readContract = () => new Contract(CONFIG.apostille, APOSTILLE_ABI, readProviders[readIndex]);
+/** A contract revert is an answer; anything else (timeouts, rate limits, odd node errors) means
+ *  "ask another node". */
+const isRevert = (err) => err?.code === "CALL_EXCEPTION" || !!err?.revert || typeof err?.data === "string";
+/** Cross-chain messaging fee for a seal. Zero for deployments without spokes or without the call. */
+async function broadcastFee() {
+  try {
+    return await withRead((c) => new Contract(c.target, ["function quoteBroadcast() view returns (uint256)"], c.runner).quoteBroadcast());
+  } catch (_) {
+    return 0n;
+  }
+}
+async function withRead(fn) {
+  let last;
+  for (let i = 0; i < readProviders.length; i++) {
+    const idx = (readIndex + i) % readProviders.length;
+    try {
+      const out = await fn(new Contract(CONFIG.apostille, APOSTILLE_ABI, readProviders[idx]), readProviders[idx]);
+      readIndex = idx;
+      return out;
+    } catch (err) {
+      if (isRevert(err)) throw err;
+      last = err;
+    }
+  }
+  throw last;
+}
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "–");
 const usd = (v) => {
   const n = Number(v);
@@ -83,6 +119,7 @@ function setStep(name, state) {
 }
 function resetSteps() {
   for (const li of steps.children) delete li.dataset.state;
+  if (typeof sealbox !== "undefined" && sealbox) sealbox.hidden = true;
 }
 function showNotice(text, kind = "error") {
   notice.hidden = !text;
@@ -90,7 +127,20 @@ function showNotice(text, kind = "error") {
   notice.dataset.kind = kind;
 }
 
+/** The innermost human message in an ethers / wallet / node error. Ethers wraps errors it can't
+ *  classify as UNKNOWN_ERROR ("could not coalesce error"); the real cause is inside. */
+function innerMessage(err) {
+  const cands = [err?.info?.error?.message, err?.error?.message, err?.info?.error?.data?.message, err?.data?.message, err?.info?.payload && err?.error?.message, err?.message];
+  return cands.find((m) => typeof m === "string" && m && !/could not coalesce/i.test(m)) || "";
+}
+
 function explain(err) {
+  const inner = innerMessage(err);
+  if (/insufficient funds|exceeds balance|not enough (balance|funds)|gas required exceeds/i.test(inner))
+    return "This wallet doesn't have enough test BNB for gas. Sealing is optional: your proof is already verified. To seal, get free tBNB from the BNB Chain testnet faucet (testnet.bnbchain.org/faucet-smart) and try again.";
+  if (/rate limit|too many requests|limit exceeded|429|timeout|timed out|failed to fetch|network error/i.test(inner))
+    return "The BNB Chain testnet node didn't answer. Wait a few seconds and try again.";
+  if (/user (rejected|denied)|rejected the request/i.test(inner)) return "You cancelled the request in your wallet.";
   const data = err?.data ?? err?.info?.error?.data ?? err?.error?.data;
   if (data && CONFIG.apostille) {
     try {
@@ -106,17 +156,19 @@ function explain(err) {
       : "Primus couldn't verify your Binance data. Check that you're logged in to Binance in this browser, then try again.";
   if (err?.code && /^\d+$/.test(String(err.code)))
     return `Primus returned error ${err.code}${err.message ? `: ${err.message}` : ""}. Check that you're logged in to Binance in this browser.`;
-  return err?.shortMessage || err?.message || String(err);
+  if (err?.code === "UNKNOWN_ERROR" || /could not coalesce/i.test(err?.message || ""))
+    return inner ? `Your wallet returned an error: ${inner}` : "Your wallet returned an error it didn't explain. Check that it's on BNB Smart Chain testnet and unlocked, then try again.";
+  return err?.shortMessage || inner || err?.message || String(err);
 }
 
 // ── Chain ────────────────────────────────────────────────────────────────
 
 // ── Certificate ──────────────────────────────────────────────────────────
-function renderCertificate(seal, status, { animate = false } = {}) {
+function renderCertificate(seal, status, { animate = false, preview = false } = {}) {
   const has = !!seal;
   const active = has && status?.active;
   const tier = has ? Number(active ? status.tier : seal.tier) : 0;
-  cert.dataset.state = active ? "active" : has ? "expired" : "empty";
+  cert.dataset.state = preview ? "preview" : active ? "active" : has ? "expired" : "empty";
 
   const seed = has ? seal.account : account || ZERO_HASH;
   const name = has ? tiers[tier]?.name ?? `Tier ${tier}` : "Specimen";
@@ -129,7 +181,9 @@ function renderCertificate(seal, status, { animate = false } = {}) {
   $("tier-numeral").hidden = !has;
   $("cert-title").textContent = has ? `${name} seal` : "Specimen";
 
-  $("cert-status").textContent = !account
+  $("cert-status").textContent = preview
+    ? "Verified by the contract. Not sealed yet: sealing is optional."
+    : !account
     ? "Connect a wallet to see its seal."
     : !has
       ? "This wallet has no seal yet."
@@ -145,7 +199,7 @@ function renderCertificate(seal, status, { animate = false } = {}) {
   $("cert-discount").textContent = active ? pct(status.discountBps) : "–";
   $("cert-expiry").textContent = has ? date(seal.expiresAt) : "–";
   $("cert-account").textContent = has ? short(seal.account) : "–";
-  btnRelease.hidden = !has;
+  btnRelease.hidden = !has || preview;
 
   if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     cert.dataset.drawing = "";
@@ -195,7 +249,7 @@ function renderLadder(seal = ladderState.seal, currentTier = ladderState.tier) {
 async function loadTiers() {
   if (!CONFIG.apostille) return;
   try {
-    const live = await readContract().tiers();
+    const live = await withRead((c) => c.tiers());
     if (live.length) tiers = live;
   } catch (_) {
     /* keep fallback table */
@@ -205,8 +259,7 @@ async function loadTiers() {
 async function loadSeal(opts) {
   if (!account || !CONFIG.apostille) return renderCertificate(null);
   try {
-    const c = readContract();
-    const [seal, status] = await Promise.all([c.sealOf(account), c.tierOf(account)]);
+    const [seal, status] = await withRead((c) => Promise.all([c.sealOf(account), c.tierOf(account)]));
     renderCertificate(seal.account === ZERO_HASH ? null : seal, status, opts);
   } catch (err) {
     renderCertificate(null);
@@ -221,7 +274,7 @@ function setAccount(a) {
   btnConnect.setAttribute("aria-label", account ? `Connected as ${account}. Disconnect` : "Connect wallet");
   btnProve.disabled = !account;
   hint.textContent = account
-    ? "You'll approve one request, prove on Binance, then confirm one transaction."
+    ? "You'll approve one request and prove on Binance. Free: sealing on-chain afterwards is optional."
     : "Connect a wallet on BNB Smart Chain testnet to start.";
   flow.dataset.open = "false";
   resetSteps();
@@ -296,26 +349,19 @@ btnProve.addEventListener("click", async () => {
     window.__apostille = { attestation };
     console.info("apostille: attestation data", attestation.data, "conditions", attestation.attConditions);
 
-    // 3. Submit to Apostille.
-    stage = "seal";
-    setStep("seal", "active");
-    await ensureChain();
+    // 3. Run the contract's own checks as a free simulation (eth_call): no transaction, no gas.
+    stage = "check";
+    setStep("check", "active");
     const att = toStruct(attestation);
-    // Pre-flight on a public node, not through the wallet: surfaces a revert reason and the gas
-    // without depending on the wallet's RPC (some wallets stall on large eth_calls).
-    const reader = readContract();
-    await reader.seal.staticCall(att, { from: account });
-    const gas = await reader.seal.estimateGas(att, { from: account });
-
-    const signer = await new BrowserProvider(window.ethereum).getSigner();
-    const apostille = new Contract(CONFIG.apostille, APOSTILLE_ABI, signer);
-    showNotice("Confirm the transaction in your wallet.", "ok");
-    const tx = await withWalletTimeout(apostille.seal(att, { gasLimit: (gas * 12n) / 10n }));
-    showNotice("Transaction sent. Waiting for confirmation…", "ok");
-    await tx.wait();
-    setStep("seal", "done");
-    showNotice("Sealed. Protocols can now read your tier.", "ok");
-    await loadSeal({ animate: true });
+    const preview = await withRead((c) => c.seal.staticCall(att, { from: account }));
+    setStep("check", "done");
+    pending = { att, at: Date.now(), for: account };
+    const t = Number(preview.tier);
+    renderCertificate(preview, { active: true, tier: t, discountBps: tiers[t]?.feeDiscountBps ?? 0 }, { animate: true, preview: true });
+    sealbox.hidden = false;
+    $("sealbox-text").textContent = `Your proof passed every check: ${tiers[t]?.name ?? `tier ${t}`} tier. Sealing is optional. It stores the result on-chain so any protocol can read your tier.`;
+    $("sealbox-hint").textContent = "One transaction on BNB Smart Chain testnet. The proof stays valid for 15 minutes.";
+    showNotice("");
   } catch (err) {
     console.error(err);
     setStep(stage, "error");
@@ -323,6 +369,48 @@ btnProve.addEventListener("click", async () => {
   } finally {
     btnProve.disabled = !account;
     btnProve.textContent = "Prove my Binance tier";
+  }
+});
+
+// ── Optional: seal on-chain ──────────────────────────────────────────────
+btnSeal.addEventListener("click", async () => {
+  if (!pending || pending.for !== account) return showNotice("Prove your tier first.");
+  if (Date.now() - pending.at > 14 * 60 * 1000) {
+    sealbox.hidden = true;
+    return showNotice("This proof is older than 15 minutes, so the contract won't accept it. Prove again, then seal.");
+  }
+  showNotice("");
+  btnSeal.disabled = true;
+  setStep("seal", "active");
+  try {
+    await ensureChain();
+    const value = await broadcastFee();
+    // Gas and balance come from a public node, so a wallet's own RPC quirks can't break the estimate.
+    const [gas, feeData, balance] = await withRead(async (c, p) =>
+      Promise.all([c.seal.estimateGas(pending.att, { from: account, value }), p.getFeeData(), p.getBalance(account)])
+    );
+    const gasLimit = (gas * 12n) / 10n;
+    const cost = gasLimit * (feeData.gasPrice ?? 1_000_000_000n) + value;
+    if (balance < cost)
+      throw Object.assign(new Error("insufficient funds"), { info: { error: { message: "insufficient funds for gas" } } });
+
+    const signer = await new BrowserProvider(window.ethereum).getSigner();
+    const apostille = new Contract(CONFIG.apostille, APOSTILLE_ABI, signer);
+    showNotice("Confirm the transaction in your wallet.", "ok");
+    const tx = await withWalletTimeout(apostille.seal(pending.att, { value, gasLimit }));
+    showNotice("Transaction sent. Waiting for confirmation…", "ok");
+    await tx.wait();
+    setStep("seal", "done");
+    pending = null;
+    sealbox.hidden = true;
+    showNotice("Sealed. Protocols can now read your tier.", "ok");
+    await loadSeal({ animate: true });
+  } catch (err) {
+    console.error(err);
+    setStep("seal", "error");
+    showNotice(explain(err));
+  } finally {
+    btnSeal.disabled = false;
   }
 });
 

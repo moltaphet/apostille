@@ -36,7 +36,8 @@ apostille replaces the screenshot with a cryptographic proof of the exact number
  Primus extension opens
  binance.com, runs zkTLS ───────────────────────────────────▶ attests vip-fee-summary
                          ◀─────────────────────────────────── signed attestation
- seal(attestation) ──────────────────────────────────────────────────────────────────▶ Apostille.sol
+ eth_call seal(attestation): free check, no gas ─────────────────────────────────────▶ Apostille.sol
+ then, optionally, the same call as a transaction to store the seal ─────────────────▶
                                                                                         ├ primus.verifyAttestation
                                                                                         ├ recipient == msg.sender
                                                                                         ├ endpoint + json paths
@@ -59,6 +60,8 @@ using the public Primus template [`9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e`](https:
 | `vipLevel` | `$.data.vipLevel` | plain |
 | `spot30dVol` | `$.data.spot30dVol` | plain |
 | `futures30dVol` | `$.data.futures30dVol` | plain |
+
+the demo is free end to end: after the zkTLS proof, the site runs the contract's `seal` as an `eth_call`, so every on-chain check runs and the resulting tier shows on the certificate without a transaction. storing the seal, which is what protocols read, is a separate optional step that costs a little test BNB.
 
 ## two disclosure modes
 

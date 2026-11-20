@@ -241,3 +241,11 @@ figcaption { max-width: 560px; margin: 1.75rem auto 0; }
   .rung-bar { grid-column: 1 / -1; grid-row: 2; }
   .rung-vip { display: none; }
 }
+
+/* ── optional seal ─────────────────────────────────────────────────── */
+.steps em { font-style: normal; font-weight: 400; color: var(--ink-soft); }
+.sealbox { margin-top: 1.25rem; padding: 1rem 1.1rem; border: 1px solid var(--ink); background: rgba(255, 255, 255, 0.35); }
+.sealbox[hidden] { display: none; }
+.sealbox p { margin: 0 0 .8rem; }
+.sealbox .flow-hint { margin: .6rem 0 0; }
+.certificate[data-state="preview"] .cert-status { color: var(--line); }
