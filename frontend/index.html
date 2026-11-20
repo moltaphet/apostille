@@ -66,11 +66,20 @@
                 <b>Prove it on Binance</b>
                 <span>The Primus extension opens Binance and reads your fee summary over zkTLS.</span>
               </li>
+              <li data-step="check">
+                <b>Check it against the contract</b>
+                <span>Apostille's contract runs every check on your proof as a free simulation. No transaction, no gas.</span>
+              </li>
               <li data-step="seal">
-                <b>Seal it on-chain</b>
-                <span>Confirm one transaction. The contract checks the proof and records your tier.</span>
+                <b>Seal it on-chain <em>(optional)</em></b>
+                <span>Store the result so any protocol can read your tier. One transaction, a fraction of a cent in test BNB.</span>
               </li>
             </ol>
+            <div class="sealbox" id="sealbox" hidden>
+              <p id="sealbox-text">Your proof passed every check. Sealing is optional: it stores the result on-chain so protocols can read it.</p>
+              <button id="btn-seal" class="btn btn-ink" type="button">Seal on-chain</button>
+              <p class="flow-hint" id="sealbox-hint"></p>
+            </div>
             <div class="notice" id="notice" role="status" hidden></div>
           </div>
 
