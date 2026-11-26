@@ -76,14 +76,6 @@ const readContract = () => new Contract(CONFIG.apostille, APOSTILLE_ABI, readPro
 /** A contract revert is an answer; anything else (timeouts, rate limits, odd node errors) means
  *  "ask another node". */
 const isRevert = (err) => err?.code === "CALL_EXCEPTION" || !!err?.revert || typeof err?.data === "string";
-/** Cross-chain messaging fee for a seal. Zero for deployments without spokes or without the call. */
-async function broadcastFee() {
-  try {
-    return await withRead((c) => new Contract(c.target, ["function quoteBroadcast() view returns (uint256)"], c.runner).quoteBroadcast());
-  } catch (_) {
-    return 0n;
-  }
-}
 async function withRead(fn) {
   let last;
   for (let i = 0; i < readProviders.length; i++) {
@@ -99,6 +91,7 @@ async function withRead(fn) {
   }
   throw last;
 }
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "–");
 const usd = (v) => {
   const n = Number(v);
@@ -233,7 +226,7 @@ function renderLadder(seal = ladderState.seal, currentTier = ladderState.tier) {
           : `<span class="rung-mark" style="left:${mine}%"></span>` +
             (i === Math.max(currentTier, 0) ? `<span class="rung-you" style="left:${Math.min(mine, 88)}%">You: ${usd(seal.futures30dVolume)}</span>` : "");
       return `<li class="rung" ${i === currentTier ? "data-current" : ""}>
-        <span class="rung-name">${t.name}</span>
+        <span class="rung-name">${esc(t.name)}</span>
         <span class="rung-vip">${vip}</span>
         <span class="rung-bar" role="img" aria-label="${label}">
           <span class="rung-fill" style="width:${fill}%"></span>${mark}
@@ -256,12 +249,17 @@ async function loadTiers() {
   }
 }
 
+let sealRead = 0;
 async function loadSeal(opts) {
-  if (!account || !CONFIG.apostille) return renderCertificate(null);
+  const ticket = ++sealRead;
+  const who = account;
+  if (!who || !CONFIG.apostille) return renderCertificate(null);
   try {
-    const [seal, status] = await withRead((c) => Promise.all([c.sealOf(account), c.tierOf(account)]));
+    const [seal, status] = await withRead((c) => Promise.all([c.sealOf(who), c.tierOf(who)]));
+    if (ticket !== sealRead) return; // the wallet changed while this read was in flight
     renderCertificate(seal.account === ZERO_HASH ? null : seal, status, opts);
   } catch (err) {
+    if (ticket !== sealRead) return;
     renderCertificate(null);
     showNotice(`Couldn't read this wallet's seal: ${explain(err)}`);
   }
@@ -355,7 +353,7 @@ btnProve.addEventListener("click", async () => {
     const att = toStruct(attestation);
     const preview = await withRead((c) => c.seal.staticCall(att, { from: account }));
     setStep("check", "done");
-    pending = { att, at: Date.now(), for: account };
+    pending = { att, at: Number(att.timestamp), for: account.toLowerCase() };
     const t = Number(preview.tier);
     renderCertificate(preview, { active: true, tier: t, discountBps: tiers[t]?.feeDiscountBps ?? 0 }, { animate: true, preview: true });
     sealbox.hidden = false;
@@ -374,7 +372,7 @@ btnProve.addEventListener("click", async () => {
 
 // ── Optional: seal on-chain ──────────────────────────────────────────────
 btnSeal.addEventListener("click", async () => {
-  if (!pending || pending.for !== account) return showNotice("Prove your tier first.");
+  if (!pending || pending.for !== account.toLowerCase()) return showNotice("Prove your tier first.");
   if (Date.now() - pending.at > 14 * 60 * 1000) {
     sealbox.hidden = true;
     return showNotice("This proof is older than 15 minutes, so the contract won't accept it. Prove again, then seal.");
@@ -384,20 +382,19 @@ btnSeal.addEventListener("click", async () => {
   setStep("seal", "active");
   try {
     await ensureChain();
-    const value = await broadcastFee();
     // Gas and balance come from a public node, so a wallet's own RPC quirks can't break the estimate.
     const [gas, feeData, balance] = await withRead(async (c, p) =>
-      Promise.all([c.seal.estimateGas(pending.att, { from: account, value }), p.getFeeData(), p.getBalance(account)])
+      Promise.all([c.seal.estimateGas(pending.att, { from: account }), p.getFeeData(), p.getBalance(account)])
     );
     const gasLimit = (gas * 12n) / 10n;
-    const cost = gasLimit * (feeData.gasPrice ?? 1_000_000_000n) + value;
+    const cost = gasLimit * (feeData.gasPrice ?? 1_000_000_000n);
     if (balance < cost)
       throw Object.assign(new Error("insufficient funds"), { info: { error: { message: "insufficient funds for gas" } } });
 
     const signer = await new BrowserProvider(window.ethereum).getSigner();
     const apostille = new Contract(CONFIG.apostille, APOSTILLE_ABI, signer);
     showNotice("Confirm the transaction in your wallet.", "ok");
-    const tx = await withWalletTimeout(apostille.seal(pending.att, { value, gasLimit }));
+    const tx = await withWalletTimeout(apostille.seal(pending.att, { gasLimit }));
     showNotice("Transaction sent. Waiting for confirmation…", "ok");
     await tx.wait();
     setStep("seal", "done");
@@ -415,7 +412,10 @@ btnSeal.addEventListener("click", async () => {
 });
 
 btnRelease.addEventListener("click", async () => {
+  if (btnRelease.disabled) return;
+  if (!confirm("Release this seal? Protocols will stop seeing your tier until you prove again.")) return;
   showNotice("");
+  btnRelease.disabled = true;
   try {
     await ensureChain();
     const signer = await new BrowserProvider(window.ethereum).getSigner();
@@ -425,6 +425,8 @@ btnRelease.addEventListener("click", async () => {
     await loadSeal();
   } catch (err) {
     showNotice(explain(err));
+  } finally {
+    btnRelease.disabled = false;
   }
 });
 
@@ -460,7 +462,7 @@ function withWalletTimeout(promise, ms = 3 * 60 * 1000) {
 function renderTargets() {
   targetTier.innerHTML = tiers
     .slice(1)
-    .map((t, i) => `<option value="${i + 1}">${t.name}: VIP ${t.minVipLevel}+ or ${usd(t.minFuturesVolume)}+ futures</option>`)
+    .map((t, i) => `<option value="${i + 1}">${esc(t.name)}: VIP ${t.minVipLevel}+ or ${usd(t.minFuturesVolume)}+ futures</option>`)
     .join("");
 }
 modeInputs.forEach((i) => i.addEventListener("change", () => (targetWrap.hidden = mode() !== "concealed")));

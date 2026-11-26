@@ -132,6 +132,7 @@ contract Apostille is Ownable2Step {
     error NotGuardian(address caller);
     error SealingPaused();
     error MalformedPayload();
+    error AmbiguousKey(string key);
 
     // ---------------------------------------------------------------------
     // Construction & admin
@@ -228,13 +229,19 @@ contract Apostille is Ownable2Step {
         // 4. Fresh, and newer than anything this account has used before.
         uint64 issuedAt = _checkFreshness(att.timestamp);
 
-        // 5. Decode. Each figure is either revealed exactly or proven against a threshold.
+        // 5. Decode. Each figure is either revealed exactly or proven against a threshold, and
+        //    each must be read from its own key that appears exactly once in the data.
         string[] memory conds = att.attConditions.objects();
-        bytes32 account = keccak256(abi.encode(sourceId, _hashedId(att.data, conds, src.idPath)));
+        string memory idKey = _hashedIdKey(att.data, conds, src.idPath);
+        (string memory vipKey, bool c1, string memory vipBar) = _figure(att, conds, src.vipPath);
+        (string memory spotKey, bool c2, string memory spotBar) = _figure(att, conds, src.spotPath);
+        (string memory futKey, bool c3, string memory futBar) = _figure(att, conds, src.futuresPath);
+        _checkKeys(att.data, idKey, vipKey, spotKey, futKey);
 
-        (uint256 vip, bool c1) = _readFloor(att, conds, src.vipPath);
-        (uint256 spot, bool c2) = _readFloor(att, conds, src.spotPath);
-        (uint256 futures, bool c3) = _readFloor(att, conds, src.futuresPath);
+        bytes32 account = keccak256(abi.encode(sourceId, att.data.get(idKey).toBytes32()));
+        uint256 vip = _readFigure(att.data, vipKey, c1, vipBar);
+        uint256 spot = _readFigure(att.data, spotKey, c2, spotBar);
+        uint256 futures = _readFigure(att.data, futKey, c3, futBar);
 
         uint64 last = lastAttestationAt[account];
         if (att.timestamp <= last) revert ReplayedAttestation(att.timestamp, last);
@@ -310,39 +317,78 @@ contract Apostille is Ownable2Step {
 
     /// @dev Primus reports a hashed field under "SHA256(<jsonPath>)". Requiring that key means a
     ///      proof that revealed the raw id can never be accepted.
-    function _hashedId(string calldata data, string[] memory conds, string storage idPath)
+    function _hashedIdKey(string calldata data, string[] memory conds, string storage idPath)
         private
         view
-        returns (bytes32)
+        returns (string memory key)
     {
         (bool found, string memory op,,) = _condition(conds, idPath);
         if (found && keccak256(bytes(op)) != OP_SHA256) revert IdNotHashed(idPath);
-        (bool ok, string memory v) = data.tryGet(string.concat("SHA256(", idPath, ")"));
+        key = string.concat("SHA256(", idPath, ")");
+        (bool ok,) = data.tryGet(key);
         if (!ok) revert IdNotHashed(idPath);
-        return v.toBytes32();
     }
 
-    /// @dev Returns the figure at `path` and whether it was concealed behind a threshold.
-    ///      Revealed: the exact value, keyed by the template's keyName.
-    ///      ">=" / ">": the threshold if the attested condition is true, else 0.
-    function _readFloor(Attestation calldata att, string[] memory conds, string storage path)
+    /// @dev Where the figure at `path` lives in the data, and whether it is concealed.
+    ///      Revealed: keyed by the template's keyName, holding the exact value.
+    ///      ">=" / ">": keyed by the condition's reveal_id (or "<op>(<path>)"), holding a boolean;
+    ///      `threshold` is the bar it was checked against.
+    function _figure(Attestation calldata att, string[] memory conds, string storage path)
         private
         view
-        returns (uint256 value, bool concealed)
+        returns (string memory key, bool concealed, string memory threshold)
     {
-        (bool found, string memory op, string memory threshold, string memory revealId) = _condition(conds, path);
+        (bool found, string memory op, string memory value, string memory revealId) = _condition(conds, path);
         bytes32 h = keccak256(bytes(op));
 
-        if (!found || h == OP_REVEAL) {
-            return (att.data.get(_keyNameFor(att.reponseResolve, path)).toUintFloor(), false);
-        }
+        if (!found || h == OP_REVEAL) return (_keyNameFor(att.reponseResolve, path), false, "");
         if (h == OP_GTE || h == OP_GT) {
-            (bool ok, string memory result) = att.data.tryGet(revealId);
-            if (!ok) (ok, result) = att.data.tryGet(string.concat(op, "(", path, ")"));
-            if (!ok) revert MissingField(path);
-            return (result.isTrue() ? threshold.toUintFloor() : 0, true);
+            if (bytes(revealId).length != 0) {
+                (bool ok,) = att.data.tryGet(revealId);
+                if (ok) return (revealId, true, value);
+            }
+            key = string.concat(op, "(", path, ")");
+            (bool ok2,) = att.data.tryGet(key);
+            if (!ok2) revert MissingField(path);
+            return (key, true, value);
         }
         revert UnsupportedCondition(op, path);
+    }
+
+    /// @dev The exact value, or the threshold if the attested condition holds (else 0).
+    function _readFigure(string calldata data, string memory key, bool concealed, string memory threshold)
+        private
+        pure
+        returns (uint256)
+    {
+        string memory v = data.get(key);
+        if (!concealed) return v.toUintFloor();
+        return v.isTrue() ? threshold.toUintFloor() : 0;
+    }
+
+    /// @dev The data must hold exactly the four keys Apostille reads, each once, and no two
+    ///      figures may share a key. Otherwise a condition's result could be read from another
+    ///      field's slot (e.g. a true "vipLevel >= 0" passed off as "futures >= 250M").
+    function _checkKeys(string calldata data, string memory a, string memory b, string memory c, string memory d)
+        private
+        pure
+    {
+        bytes32[4] memory want = [keccak256(bytes(a)), keccak256(bytes(b)), keccak256(bytes(c)), keccak256(bytes(d))];
+        for (uint256 i; i < 4; ++i) {
+            for (uint256 k = i + 1; k < 4; ++k) {
+                if (want[i] == want[k]) revert AmbiguousKey(i == 0 ? a : i == 1 ? b : c);
+            }
+        }
+        string[] memory present = data.keys();
+        if (present.length != 4) revert MalformedPayload();
+        bool[4] memory seen;
+        for (uint256 i; i < 4; ++i) {
+            bytes32 h = keccak256(bytes(present[i]));
+            uint256 k;
+            while (k < 4 && want[k] != h) ++k;
+            if (k == 4 || seen[k]) revert AmbiguousKey(present[i]);
+            seen[k] = true;
+        }
     }
 
     /// @dev Finds the condition object for `path`, if any.

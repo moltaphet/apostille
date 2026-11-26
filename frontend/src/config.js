@@ -42,6 +42,7 @@ export const APOSTILLE_ABI = [
   "error KeyNotFound(string key)",
   "error SealingPaused()",
   "error MalformedPayload()",
+  "error AmbiguousKey(string key)",
   "error InvalidNumber(string value)",
   "error InvalidHex(string value)",
 ];
@@ -62,4 +63,5 @@ export const ERROR_TEXT = {
   UnsupportedCondition: "The proof uses a condition Apostille doesn't accept.",
   SealingPaused: "New seals are paused right now. Existing seals still work. Try again later.",
   MalformedPayload: "The proof's data isn't in the shape Apostille expects. Start the proof again.",
+  AmbiguousKey: "The proof reports two figures under the same name, so Apostille can't tell them apart. Start the proof again.",
 };

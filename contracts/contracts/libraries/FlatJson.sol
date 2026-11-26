@@ -35,6 +35,33 @@ library FlatJson {
         }
     }
 
+    /// @notice Every top-level key of a flat object, in order, duplicates included.
+    /// @dev A key is a quoted string followed by ':'. Uses the same quoting rules as `tryGet`,
+    ///      so the two always agree on what is a key.
+    function keys(string memory json) internal pure returns (string[] memory out) {
+        bytes memory j = bytes(json);
+        uint256 n = j.length;
+        uint256[] memory starts = new uint256[](n / 3 + 1);
+        uint256[] memory ends = new uint256[](n / 3 + 1);
+        uint256 count;
+        for (uint256 i; i < n; ++i) {
+            if (j[i] != '"') continue;
+            uint256 start = i + 1;
+            uint256 end = start;
+            while (end < n && j[end] != '"') ++end;
+            uint256 p = end + 1;
+            while (p < n && _isSpace(j[p])) ++p;
+            if (p < n && j[p] == ":") {
+                starts[count] = start;
+                ends[count] = end;
+                ++count;
+            }
+            i = end; // skip past the closing quote
+        }
+        out = new string[](count);
+        for (uint256 k; k < count; ++k) out[k] = string(_slice(j, starts[k], ends[k]));
+    }
+
     /// @notice Like `get`, but returns `found = false` instead of reverting.
     function tryGet(string memory json, string memory key) internal pure returns (bool found, string memory value) {
         bytes memory j = bytes(json);

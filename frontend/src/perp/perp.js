@@ -40,6 +40,7 @@ function feeOn(notional, discountBps) {
 
 const money = (n) => "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
 const pct = (pips) => `${(Number(pips) / 10_000).toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}%`;
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 function notional() {
@@ -60,7 +61,7 @@ function renderOptions() {
   const keep = asTier.value;
   asTier.innerHTML =
     (account ? `<option value="mine">My seal (${short(account)})</option>` : "") +
-    tiers.map((t, i) => `<option value="${i}">${t.name}, ${Number(t.feeDiscountBps) / 100}% off</option>`).join("");
+    tiers.map((t, i) => `<option value="${i}">${esc(t.name)}, ${Number(t.feeDiscountBps) / 100}% off</option>`).join("");
   asTier.value = account ? "mine" : [...asTier.options].some((o) => o.value === keep) ? keep : "0";
 }
 
@@ -80,7 +81,7 @@ function render() {
   $("compare-rows").innerHTML = tiers
     .map((t, i) => {
       const r = feeOn(n, Number(t.feeDiscountBps));
-      return `<tr ${i === myIdx ? "data-current" : ""}><td>${t.name}</td><td>${pct(r.ratePips)}</td><td>${money(r.fee)}</td><td>${money(base.fee - r.fee)}</td></tr>`;
+      return `<tr ${i === myIdx ? "data-current" : ""}><td>${esc(t.name)}</td><td>${pct(r.ratePips)}</td><td>${money(r.fee)}</td><td>${money(base.fee - r.fee)}</td></tr>`;
     })
     .join("");
 }
@@ -125,6 +126,17 @@ btnConnect.addEventListener("click", async () => {
     btnConnect.disabled = false;
   }
 });
+
+if (window.ethereum) {
+  window.ethereum.on?.("accountsChanged", () => {
+    account = "";
+    mine = null;
+    btnConnect.textContent = "Connect wallet";
+    $("size-hint").textContent = "Wallet changed. Connect again to price from its seal.";
+    renderOptions();
+    render();
+  });
+}
 
 // ── boot ────────────────────────────────────────────────────────────────
 (async () => {

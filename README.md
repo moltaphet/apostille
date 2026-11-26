@@ -147,6 +147,7 @@ what the contract enforces, on top of Primus's attestor-signature check (which, 
 - **recipient binding**: `attestation.recipient` must equal `msg.sender`, so a proof seen in the mempool is useless to anyone else.
 - **source pinning**: the request url must be the `vip-fee-summary` endpoint (exact match or with a query string; no path suffixes).
 - **field pinning**: every revealed field must come from its expected json path, so a template can't map `futures30dVol` onto a different number in the same response.
+- **one key per figure**: the attested data must hold exactly the four keys apostille reads, each once, and no two figures may share a key, so one condition's `true` can't be read as another's (e.g. `vipLevel >= 0` passed off as `futures30dVol >= 250M`).
 - **hashed identity**: `userId` must be a 32-byte hash. a raw uid fails to parse and the transaction reverts.
 - **payload shape**: `data` must be one `{…}` object and `attConditions` one `[…]` array. Primus signs `abi.encodePacked` over consecutive strings, so this stops bytes being shifted from one field into the next without breaking the signature (flagged by Slither, covered by a test)
 - **freshness**: the attestation must be at most 15 minutes old and not from the future (5 min clock drift).
