@@ -35,7 +35,8 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: "signer is not configured" });
   }
 
-  const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
+  // Vercel sets x-real-ip itself; the first x-forwarded-for entry can be supplied by the client.
+  const ip = req.headers["x-real-ip"] || (req.headers["x-forwarded-for"] || "").split(",").pop().trim() || "unknown";
   if (limited(ip)) return res.status(429).json({ error: "too many requests" });
 
   const body = typeof req.body === "string" ? safeJson(req.body) : req.body;

@@ -4,7 +4,7 @@ export const CONFIG = {
   templateId: import.meta.env.VITE_PRIMUS_TEMPLATE_ID || "9e2dff87-3bfd-4a65-ad84-9eeb87d0f56e",
   signerUrl: (import.meta.env.VITE_SIGNER_URL || "/api").replace(/\/$/, ""),
   // Public testnet deployment; override with VITE_APOSTILLE_ADDRESS.
-  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x7EDa50410744a3e2B10a82016d8767f911cFD0B2",
+  apostille: import.meta.env.VITE_APOSTILLE_ADDRESS || "0x68fac33fe5CD732413511cfc7e12c0d279340f3a",
 };
 
 export const CHAIN = {
@@ -14,7 +14,7 @@ export const CHAIN = {
     chainId: "0x61",
     chainName: "BNB Smart Chain Testnet",
     nativeCurrency: { name: "tBNB", symbol: "tBNB", decimals: 18 },
-    rpcUrls: ["https://data-seed-prebsc-1-s1.bnbchain.org:8545"],
+    rpcUrls: ["https://bsc-testnet.drpc.org", "https://bsc-testnet-rpc.publicnode.com", "https://data-seed-prebsc-1-s1.bnbchain.org:8545"],
     blockExplorerUrls: ["https://testnet.bscscan.com"],
   },
   explorer: "https://testnet.bscscan.com",
@@ -42,6 +42,7 @@ export const APOSTILLE_ABI = [
   "error KeyNotFound(string key)",
   "error SealingPaused()",
   "error MalformedPayload()",
+  "error AmbiguousKey(string key)",
   "error InvalidNumber(string value)",
   "error InvalidHex(string value)",
 ];
@@ -62,4 +63,5 @@ export const ERROR_TEXT = {
   UnsupportedCondition: "The proof uses a condition Apostille doesn't accept.",
   SealingPaused: "New seals are paused right now. Existing seals still work. Try again later.",
   MalformedPayload: "The proof's data isn't in the shape Apostille expects. Start the proof again.",
+  AmbiguousKey: "The proof reports two figures under the same name, so Apostille can't tell them apart. Start the proof again.",
 };

@@ -27,8 +27,10 @@ module.exports = {
     settings: { optimizer: { enabled: true, runs: 500 }, viaIR: true },
   },
   networks: {
+    // HARDHAT_INITIAL_DATE lets scripts/replay-seal.js start the local chain before an old attestation.
+    hardhat: process.env.HARDHAT_INITIAL_DATE ? { initialDate: process.env.HARDHAT_INITIAL_DATE } : {},
     bscTestnet: {
-      url: BSC_TESTNET_RPC_URL || "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+      url: BSC_TESTNET_RPC_URL || "https://bsc-testnet.drpc.org",
       chainId: 97,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
     },

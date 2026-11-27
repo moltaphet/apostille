@@ -4,7 +4,7 @@ import { AbiCoder, Interface } from "ethers";
 import { APOSTILLE_ABI, feeOn, getTier, getSeal } from "../src/index.js";
 
 const iface = new Interface(APOSTILLE_ABI);
-const ADDR = "0x7EDa50410744a3e2B10a82016d8767f911cFD0B2";
+const ADDR = "0x68fac33fe5CD732413511cfc7e12c0d279340f3a";
 
 /** Minimal ethers v6 runner that answers eth_call from a table. */
 function fakeRunner(answers) {

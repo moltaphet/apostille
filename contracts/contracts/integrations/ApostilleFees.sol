@@ -18,15 +18,16 @@ library ApostilleFees {
         view
         returns (uint256 rate, uint8 tier)
     {
-        if (address(apostille) == address(0)) return (baseFeeRate, 0);
-        try apostille.tierOf(trader) returns (bool active, uint8 t, uint16 discountBps) {
-            if (!active) return (baseFeeRate, 0);
-            uint256 d = discountBps > maxDiscountBps ? maxDiscountBps : discountBps;
-            if (d > BPS) d = BPS;
-            return (baseFeeRate * (BPS - d) / BPS, t);
-        } catch {
-            return (baseFeeRate, 0);
-        }
+        // A low-level call, not try/catch: try/catch can't catch a call to an address without
+        // code or a malformed return value (both revert in the caller while decoding).
+        (bool ok, bytes memory ret) =
+            address(apostille).staticcall(abi.encodeCall(IApostille.tierOf, (trader)));
+        if (!ok || ret.length != 96) return (baseFeeRate, 0);
+        (uint256 active, uint256 t, uint256 discountBps) = abi.decode(ret, (uint256, uint256, uint256));
+        if (active != 1 || t > type(uint8).max) return (baseFeeRate, 0);
+        uint256 d = discountBps > maxDiscountBps ? maxDiscountBps : discountBps;
+        if (d > BPS) d = BPS;
+        return (baseFeeRate * (BPS - d) / BPS, uint8(t));
     }
 
     /// @notice Fee owed on `notional` at the trader's discounted rate, with the rate in pips

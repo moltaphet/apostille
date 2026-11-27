@@ -2,7 +2,7 @@
 
 **carry your exchange tier on-chain.**
 
-[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x7EDa50410744a3e2B10a82016d8767f911cFD0B2)
+[live app](https://apostille-two.vercel.app) · [deploy page](https://apostille-two.vercel.app/deploy) · [contract on BscScan](https://testnet.bscscan.com/address/0x68fac33fe5CD732413511cfc7e12c0d279340f3a)
 
 apostille lets a trader prove their Binance VIP level and 30-day trading volume with a [Primus](https://primuslabs.xyz) zkTLS attestation, and turns it into an on-chain seal any protocol can read in one call. the Binance user id never reaches the chain: it is SHA256-hashed inside the proof and used as a nullifier, so one exchange account backs exactly one wallet.
 
@@ -147,6 +147,7 @@ what the contract enforces, on top of Primus's attestor-signature check (which, 
 - **recipient binding**: `attestation.recipient` must equal `msg.sender`, so a proof seen in the mempool is useless to anyone else.
 - **source pinning**: the request url must be the `vip-fee-summary` endpoint (exact match or with a query string; no path suffixes).
 - **field pinning**: every revealed field must come from its expected json path, so a template can't map `futures30dVol` onto a different number in the same response.
+- **one key per figure**: the attested data must hold exactly the four keys apostille reads, each once, and no two figures may share a key, so one condition's `true` can't be read as another's (e.g. `vipLevel >= 0` passed off as `futures30dVol >= 250M`).
 - **hashed identity**: `userId` must be a 32-byte hash. a raw uid fails to parse and the transaction reverts.
 - **payload shape**: `data` must be one `{…}` object and `attConditions` one `[…]` array. Primus signs `abi.encodePacked` over consecutive strings, so this stops bytes being shifted from one field into the next without breaking the signature (flagged by Slither, covered by a test)
 - **freshness**: the attestation must be at most 15 minutes old and not from the future (5 min clock drift).
@@ -200,7 +201,7 @@ import the repo on [vercel.com/new](https://vercel.com/new), set **root director
 
 | network | apostille | verifier |
 |---|---|---|
-| BNB Smart Chain testnet (97) | [`0x7EDa…D0B2`](https://testnet.bscscan.com/address/0x7EDa50410744a3e2B10a82016d8767f911cFD0B2) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
+| BNB Smart Chain testnet (97) | [`0x68fa…0f3a`](https://testnet.bscscan.com/address/0x68fac33fe5CD732413511cfc7e12c0d279340f3a) | [`AttestorVerifier` 0x9a68…8059](https://testnet.bscscan.com/address/0x9a68DC84482f7cbd9EC8167a7CbFB666eADB8059) |
 
 first real seal: a live Binance account proven through the Primus extension and sealed in [`0x661c…d4d8`](https://testnet.bscscan.com/tx/0x661c3c8f9f84f817e2419b69e871f99f1bbd8122d17c582e05d3ac7f1beed4d8) (block 143845402, 20 nov 2026). the account is VIP 0 with no volume, so it holds the Standard seal.
 
