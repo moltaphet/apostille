@@ -147,7 +147,7 @@ const OWNER_ABI = ["function owner() view returns (address)", "function primus()
 const btnCheck = $("btn-check");
 const btnSwitch = $("btn-switch");
 const addrInput = $("existing-addr");
-addrInput.value = new URLSearchParams(location.search).get("apostille") || import.meta.env.VITE_APOSTILLE_ADDRESS || "0x7EDa50410744a3e2B10a82016d8767f911cFD0B2";
+addrInput.value = new URLSearchParams(location.search).get("apostille") || import.meta.env.VITE_APOSTILLE_ADDRESS || "0x68fac33fe5CD732413511cfc7e12c0d279340f3a";
 
 /** Does `verifier` accept signatures from the SDK's attestor? Works for both our
  *  AttestorVerifier (isAttestor) and Primus's PrimusZKTLS (_attestors list). */

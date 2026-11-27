@@ -65,11 +65,7 @@ const primusInit = (async () => {
 
 // ── Formatting ───────────────────────────────────────────────────────────
 // Several public BSC testnet nodes: one rate-limiting or timing out must not break the app.
-const READ_RPCS = [
-  "https://bsc-testnet-rpc.publicnode.com",
-  CHAIN.params.rpcUrls[0],
-  "https://data-seed-prebsc-2-s1.bnbchain.org:8545",
-];
+const READ_RPCS = [...CHAIN.params.rpcUrls, "https://data-seed-prebsc-2-s1.bnbchain.org:8545"];
 const readProviders = READ_RPCS.map((u) => new JsonRpcProvider(u, CHAIN.chainId, { staticNetwork: true, batchMaxCount: 1 }));
 let readIndex = 0;
 const readContract = () => new Contract(CONFIG.apostille, APOSTILLE_ABI, readProviders[readIndex]);

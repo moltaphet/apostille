@@ -28,7 +28,7 @@ module.exports = {
   },
   networks: {
     bscTestnet: {
-      url: BSC_TESTNET_RPC_URL || "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+      url: BSC_TESTNET_RPC_URL || "https://bsc-testnet.drpc.org",
       chainId: 97,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
     },
